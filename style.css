@@ -1,0 +1,115 @@
+/**
+ * Prompt Keeper - Stylesheet
+ *
+ * 插件 UI 样式，使用 SillyTavern CSS 变量适配不同主题。
+ *
+ * @author sisjzknxhnsnejxn-cmyk
+ * @version 1.0.0
+ * @license MIT
+ */
+
+/* ============================================================
+   操作面板容器
+   ============================================================ */
+
+.pk-container {
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1px solid var(--SmartThemeBorderColor, #666);
+    border-radius: 5px;
+    background-color: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
+}
+
+/* 头部：标题 + 状态 */
+.pk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.pk-title {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: var(--SmartThemeBodyColor, #ccc);
+}
+
+/* ============================================================
+   状态显示
+   ============================================================ */
+
+.pk-status {
+    font-size: 0.8em;
+    text-align: right;
+}
+
+.pk-status-saved {
+    color: var(--SmartThemeQuoteColor, #68b968);
+}
+
+.pk-status-nosave {
+    color: var(--SmartThemeWarningColor, #f0ad4e);
+}
+
+/* ============================================================
+   操作按钮组
+   ============================================================ */
+
+.pk-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.pk-buttons .menu_button {
+    flex: 1;
+    min-width: 60px;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* ============================================================
+   设置面板
+   ============================================================ */
+
+.pk-settings {
+    margin-top: 10px;
+}
+
+.pk-setting-item {
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pk-setting-item label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--SmartThemeBodyColor, #ccc);
+}
+
+.pk-setting-item select {
+    flex: 1;
+    max-width: 200px;
+}
+
+.pk-description {
+    color: var(--SmartThemeBodyColor, #999);
+    line-height: 1.5;
+    display: block;
+    margin-top: 5px;
+}
+
+/* ============================================================
+   Toast 通知中的恢复按钮
+   ============================================================ */
+
+.pk-restore-toast-btn {
+    margin-top: 5px;
+    padding: 2px 10px;
+    font-size: 0.85em;
+}

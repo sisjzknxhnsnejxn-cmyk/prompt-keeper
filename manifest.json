@@ -1,0 +1,12 @@
+{
+    "display_name": "Prompt Keeper",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "sisjzknxhnsnejxn-cmyk",
+    "version": "1.0.0",
+    "homePage": "https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper",
+    "auto_update": true
+}
