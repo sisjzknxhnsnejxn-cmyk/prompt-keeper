@@ -4,7 +4,7 @@
  * 插件 UI 样式，使用 SillyTavern CSS 变量适配不同主题。
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 1.0.0
+ * @version 2.0.0
  * @license MIT
  */
 
@@ -112,4 +112,20 @@
     margin-top: 5px;
     padding: 2px 10px;
     font-size: 0.85em;
+}
+
+/* ============================================================
+   调试信息
+   ============================================================ */
+
+.pk-debug-info {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #444);
+    opacity: 0.7;
+}
+
+.pk-debug-info small {
+    font-size: 0.75em;
+    color: var(--SmartThemeBodyColor, #888);
 }

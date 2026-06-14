@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![SillyTavern Extension](https://img.shields.io/badge/SillyTavern-Extension-blue.svg)](https://github.com/SillyTavern/SillyTavern)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper)
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper)
 
 SillyTavern 扩展插件 — 为每个聊天会话（Chat Session）独立保存和恢复 Prompt Manager 中 Prompt Entry 的开关状态。
 
@@ -17,11 +17,51 @@ SillyTavern 扩展插件 — 为每个聊天会话（Chat Session）独立保存
 
 切换聊天时，插件自动恢复对应聊天的 Prompt Entry 配置，无需手动调整。
 
+## 🏗️ 架构设计（v2.0.0）
+
+### Prompt State Adapter
+
+所有 Prompt Entry 的读取与写入必须经过 Adapter，插件其他部分不直接访问 Prompt Manager。
+
+```
+┌─────────────────────────────────────────┐
+│            Prompt Keeper Core           │
+│   (saveConfig / restoreConfig / watch)  │
+└──────────────────┬──────────────────────┘
+                   │
+         getPromptStates() / setPromptStates()
+                   │
+┌──────────────────▼──────────────────────┐
+│         Prompt State Adapter            │
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │   Feature Detection Engine      │    │
+│  │   (运行时检测可用策略)           │    │
+│  └──────────┬──────────────────────┘    │
+│             │                           │
+│  ┌──────────▼──────────────────────┐    │
+│  │  Strategy 1: PromptManager API  │ ← 优先  │
+│  │  Strategy 2: Prompt Order Data  │         │
+│  │  Strategy 3: DOM (最后兜底)     │ ← 最低  │
+│  └─────────────────────────────────┘    │
+└─────────────────────────────────────────┘
+```
+
+### 设计原则
+
+| 原则 | 实现 |
+|------|------|
+| Feature Detection | 运行时检测 API 可用性，不依赖版本号 |
+| Adapter Pattern | 所有 prompt 读写经过统一接口 |
+| 优先级 | 官方 API → 内部数据模型 → 事件系统 → DOM |
+| 兼容性 | 自动适应 Prompt Manager 数据结构变化 |
+| 不假设 | 不硬编码 CSS 类名、DOM 结构、对象路径 |
+
 ## ✨ 功能说明
 
 ### 核心功能
 
-- **自动保存**：用户开启/关闭/修改 Prompt Entry 时自动保存状态
+- **自动保存**：用户开启/关闭 Prompt Entry 时自动保存状态
 - **自动恢复**：切换/打开/加载聊天时自动恢复该聊天对应的 Prompt Entry 配置
 - **手动操作**：提供 Save、Restore、Delete 按钮支持手动管理
 
@@ -45,8 +85,9 @@ SillyTavern 扩展插件 — 为每个聊天会话（Chat Session）独立保存
 
 按钮旁实时显示：
 
-- ✓ Saved + Last Save 时间（已保存）
+- ✓ Saved (条目数) + 保存时间（已保存）
 - ⚠ Not Saved（未保存）
+- Adapter 当前使用的检测策略
 
 ## 📦 安装步骤
 
@@ -69,25 +110,13 @@ SillyTavern 扩展插件 — 为每个聊天会话（Chat Session）独立保存
    git clone https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper.git
    ```
 
-2. 确认目录结构：
-   ```
-   extensions/
-   └── prompt-keeper/
-       ├── manifest.json
-       ├── index.js
-       ├── style.css
-       ├── settings.html
-       ├── LICENSE
-       └── README.md
-   ```
-
-3. 重启 SillyTavern 或刷新页面
+2. 重启 SillyTavern 或刷新页面
 
 ## 🔧 使用方法
 
 ### 基本使用
 
-1. 安装启用后，在 **Prompt Manager** 区域顶部会出现 Prompt Keeper 操作面板
+1. 安装启用后，在 Prompt Manager 区域附近会出现 Prompt Keeper 操作面板
 2. 正常使用 Prompt Manager 开关各条目，插件会**自动保存**状态
 3. 切换到其他聊天时，插件会根据设置**自动恢复**该聊天的配置
 
@@ -116,22 +145,39 @@ SillyTavern 扩展插件 — 为每个聊天会话（Chat Session）独立保存
 打开浏览器控制台（F12），查看带 `[PromptKeeper]` 前缀的日志：
 
 ```
-[PromptKeeper] Extension loaded successfully
+[PromptKeeper] Extension loaded (v2.0.0, Adapter strategy: promptManagerAPI)
+[PromptKeeper] [Adapter] Detected strategy: promptManagerAPI
 [PromptKeeper] Settings loaded
-[PromptKeeper] Saved config for chat: xxx
-[PromptKeeper] Restored config for chat: xxx
-[PromptKeeper] Deleted config for chat: xxx
+[PromptKeeper] Saved config for chat: xxx (15 entries, strategy: promptManagerAPI)
+[PromptKeeper] Restored config for chat: xxx (15 entries)
 [PromptKeeper] Chat changed to: xxx
 [PromptKeeper] Auto-saved after toggle change
 ```
 
-## ⚠️ 已知限制
+面板底部显示当前 Adapter 策略：`Adapter: promptManagerAPI` / `promptOrderData` / `dom` / `unavailable`
 
-- 仅支持 Chat Completion 模式下的 Prompt Manager
+## ⚠️ 兼容性
+
+- **支持**：SillyTavern 1.12+
+- **策略检测**：自动适应不同版本的 Prompt Manager 实现
+- **数据结构变化**：通过 Feature Detection 自动检测，不依赖固定对象路径
+- **仅支持** Chat Completion 模式下的 Prompt Manager
 - 如果 Prompt Entry 的 identifier 发生变化（如切换预设），旧配置可能无法正确匹配
-- 需要 SillyTavern 1.11+ 版本（支持 `event_types.CHAT_CHANGED`）
 
 ## 📋 更新日志
+
+### v2.0.0 (2025-06-14)
+
+**架构重写**
+
+- ✅ 引入 Prompt State Adapter 模式
+- ✅ Feature Detection 代替 Version Detection
+- ✅ 优先级：官方 API → 内部数据模型 → 事件系统 → DOM
+- ✅ 不再假设固定 CSS 类名、DOM 结构、对象路径
+- ✅ 自动检测 Prompt Manager 数据结构变化
+- ✅ 策略缓存与自动失效机制
+- ✅ 调试信息显示当前 Adapter 策略
+- ✅ 兼容 SillyTavern 1.12+
 
 ### v1.0.0 (2025-06-14)
 
@@ -141,53 +187,19 @@ SillyTavern 扩展插件 — 为每个聊天会话（Chat Session）独立保存
 - ✅ 聊天切换时自动恢复
 - ✅ 三种恢复模式（自动/询问/仅提示）
 - ✅ Save / Restore / Delete 操作按钮
-- ✅ 实时状态显示（保存状态 + 时间）
-- ✅ 设置面板集成
-- ✅ 防抖机制避免频繁保存
-- ✅ 事件驱动，不使用轮询
-- ✅ 使用 CSS 变量适配主题
-
-## ❓ FAQ
-
-**Q: 配置保存在哪里？**
-
-A: 保存在聊天元数据（Chat Metadata）中，随聊天文件一起存储。不会创建额外文件。
-
-**Q: 切换 Completion Preset 后，之前保存的配置还有效吗？**
-
-A: 如果新预设中的 Prompt Entry identifier 与之前相同，则有效。如果 identifier 改变了，插件只会恢复能匹配到的条目。
-
-**Q: 插件会修改 SillyTavern 核心代码吗？**
-
-A: 不会。插件完全通过官方 Extension API 实现，不修改任何核心源码。
-
-**Q: 可以禁用自动保存吗？**
-
-A: 关闭插件开关即可禁用所有自动行为。你仍然可以使用手动按钮保存/恢复。
-
-**Q: 支持群聊（Group Chat）吗？**
-
-A: 支持。插件绑定的是 Chat Session ID，群聊也有独立的聊天 ID。
+- ✅ 实时状态显示
 
 ## 📁 项目结构
 
 ```
 prompt-keeper/
 ├── manifest.json      # 插件清单文件
-├── index.js           # 插件主逻辑
+├── index.js           # 插件主逻辑（含 Prompt State Adapter）
 ├── style.css          # 插件样式
 ├── settings.html      # 设置面板模板
 ├── LICENSE            # MIT 许可证
 └── README.md          # 项目说明
 ```
-
-## 🏗️ 技术说明
-
-- 使用 SillyTavern 官方 Extension API
-- 事件驱动机制（非轮询），性能友好
-- 数据存储在聊天元数据中，无需额外后端
-- 不修改 SillyTavern 核心源码
-- CSS 变量适配不同主题
 
 ## 📄 许可证
 
