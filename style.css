@@ -3,14 +3,22 @@
 /* Button bar container */
 .prompt-keeper-bar {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    margin: 8px 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    margin: 10px 0;
     border: 1px solid var(--SmartThemeBorderColor, #555);
     border-radius: 5px;
     background-color: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
-    flex-wrap: wrap;
+}
+
+/* Header row */
+.prompt-keeper-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    font-weight: bold;
 }
 
 /* Button group */

@@ -323,12 +323,19 @@ function updateStatusDisplay(hasSave, timeStr) {
 }
 
 /**
- * Inject the UI buttons near the Prompt Manager area
+ * Inject the UI buttons below the Top P slider area
  */
 function injectUI() {
+    // Avoid duplicate injection
+    if (jQuery('#prompt-keeper-bar').length > 0) return;
+
     const buttonBarHtml = `
     <div id="prompt-keeper-bar" class="prompt-keeper-bar">
-        <span id="prompt-keeper-status" class="pk-not-saved">⚠ Not Saved</span>
+        <div class="prompt-keeper-header">
+            <i class="fa-solid fa-bookmark"></i>
+            <span>Prompt Keeper</span>
+            <span id="prompt-keeper-status" class="pk-not-saved">⚠ Not Saved</span>
+        </div>
         <div id="prompt-keeper-btn-group" class="prompt-keeper-btn-group">
             <button id="prompt-keeper-save" class="menu_button" title="Save current prompt configuration">
                 <i class="fa-solid fa-floppy-disk"></i>
@@ -345,21 +352,54 @@ function injectUI() {
         </div>
     </div>`;
 
-    // Inject before the prompt entries list (条目列表前面)
-    const $list = jQuery('#completion_prompt_manager_list');
-    if ($list.length > 0) {
-        $list.before(buttonBarHtml);
-    } else {
-        // Fallback: try to inject before the prompt manager container
-        const $target = jQuery('#completion_prompt_manager');
-        if ($target.length > 0) {
-            $target.prepend(buttonBarHtml);
-        } else {
-            const $fallback = jQuery('#ai_response_configuration');
-            if ($fallback.length > 0) {
-                $fallback.prepend(buttonBarHtml);
-            }
+    let injected = false;
+
+    // Strategy 1: Insert after the Top P slider block
+    const $topP = jQuery('#top_p_block');
+    if ($topP.length > 0) {
+        $topP.after(buttonBarHtml);
+        injected = true;
+    }
+
+    // Strategy 2: Insert after the range block containing top_p
+    if (!injected) {
+        const $topPSlider = jQuery('#top_p').closest('.range-block');
+        if ($topPSlider.length > 0) {
+            $topPSlider.after(buttonBarHtml);
+            injected = true;
         }
+    }
+
+    // Strategy 3: Insert before the prompt manager list
+    if (!injected) {
+        const $list = jQuery('#completion_prompt_manager_list');
+        if ($list.length > 0) {
+            $list.before(buttonBarHtml);
+            injected = true;
+        }
+    }
+
+    // Strategy 4: Append to AI response configuration area
+    if (!injected) {
+        const $aiConfig = jQuery('#ai_response_configuration');
+        if ($aiConfig.length > 0) {
+            $aiConfig.append(buttonBarHtml);
+            injected = true;
+        }
+    }
+
+    // Strategy 5: Append to the range block area in chat completion settings
+    if (!injected) {
+        const $chatCompletion = jQuery('#openai_settings');
+        if ($chatCompletion.length > 0) {
+            $chatCompletion.append(buttonBarHtml);
+            injected = true;
+        }
+    }
+
+    if (!injected) {
+        console.warn(LOG_PREFIX, 'Could not find a suitable injection point for UI.');
+        return;
     }
 
     // Bind button events
@@ -374,6 +414,8 @@ function injectUI() {
     jQuery('#prompt-keeper-delete').on('click', function () {
         deleteCurrentConfig();
     });
+
+    console.log(LOG_PREFIX, 'UI injected successfully.');
 }
 
 /**
@@ -395,6 +437,24 @@ async function loadSettingsPanel() {
 }
 
 /**
+ * Try to inject UI with retries (ST panels may load asynchronously)
+ * @param {number} maxRetries
+ * @param {number} interval ms between retries
+ */
+function tryInjectUI(maxRetries = 20, interval = 1000) {
+    let attempts = 0;
+    const tryInject = () => {
+        if (jQuery('#prompt-keeper-bar').length > 0) return; // Already injected
+        injectUI();
+        if (jQuery('#prompt-keeper-bar').length === 0 && attempts < maxRetries) {
+            attempts++;
+            setTimeout(tryInject, interval);
+        }
+    };
+    tryInject();
+}
+
+/**
  * Main initialization
  */
 jQuery(async () => {
@@ -404,18 +464,32 @@ jQuery(async () => {
     // Load settings panel
     await loadSettingsPanel();
 
-    // Inject UI buttons
-    injectUI();
+    // Inject UI buttons (with retry since ST panels may not be ready yet)
+    tryInjectUI();
 
     // Listen for chat changes
-    eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        // Re-inject UI if it was removed (e.g. panel re-rendered)
+        tryInjectUI(5, 500);
+        onChatChanged();
+    });
 
     // Listen for prompt checkbox state changes via event delegation
-    // Use broad selector since ST may not use .prompt_manager_enabled class
+    // Support both standard checkboxes and ST toggle elements
     jQuery(document).on(
         'change',
         '#completion_prompt_manager_list [data-pm-identifier] input[type="checkbox"]',
         onPromptStateChanged
+    );
+
+    // Also listen for click on toggle-style elements (ST may use spans with toggle class)
+    jQuery(document).on(
+        'click',
+        '#completion_prompt_manager_list [data-pm-identifier] .prompt_manager_prompt_toggle',
+        function () {
+            // Small delay to let the toggle state update
+            setTimeout(onPromptStateChanged, 100);
+        }
     );
 
     // Update status on load
