@@ -61,27 +61,75 @@ function getCurrentChatId() {
  */
 function readPromptStates() {
     const states = {};
+    // Try multiple possible container selectors
     const $container = jQuery('#completion_prompt_manager_list');
     if ($container.length === 0) {
+        console.debug(LOG_PREFIX, 'Container #completion_prompt_manager_list not found.');
         return null;
     }
 
-    $container.find('.prompt_manager_prompt').each(function () {
+    $container.find('[data-pm-identifier]').each(function () {
         const $row = jQuery(this);
-        const $checkbox = $row.find('input[type="checkbox"].prompt_manager_enabled');
-        if ($checkbox.length === 0) return;
-
         const identifier = $row.attr('data-pm-identifier');
         if (!identifier) return;
+
+        // Try multiple checkbox selectors that ST might use
+        const $checkbox = $row.find('input[type="checkbox"]').first();
+        if ($checkbox.length === 0) return;
 
         states[identifier] = $checkbox.prop('checked');
     });
 
     if (Object.keys(states).length === 0) {
-        return null;
+        console.debug(LOG_PREFIX, 'No entries with data-pm-identifier found. Trying toggle approach...');
+        // Fallback: try to read from the prompt manager's internal state via ST context
+        return readPromptStatesFromContext();
     }
 
     return states;
+}
+
+/**
+ * Fallback: Read prompt states from SillyTavern's internal context/API
+ * @returns {Object|null}
+ */
+function readPromptStatesFromContext() {
+    try {
+        const context = getContext();
+        if (!context) return null;
+
+        // Access prompt manager prompts from ST's internal structure
+        const promptManager = context.PromptManager || context.promptManager;
+        if (!promptManager) {
+            // Try to access via the global power_user or oai_settings
+            const prompts = window?.oai_settings?.prompts;
+            if (prompts && Array.isArray(prompts)) {
+                const states = {};
+                for (const prompt of prompts) {
+                    if (prompt.identifier) {
+                        states[prompt.identifier] = prompt.enabled !== false;
+                    }
+                }
+                if (Object.keys(states).length > 0) return states;
+            }
+            return null;
+        }
+
+        const serviceSettings = promptManager.serviceSettings;
+        if (!serviceSettings || !serviceSettings.prompts) return null;
+
+        const states = {};
+        for (const prompt of serviceSettings.prompts) {
+            if (prompt.identifier) {
+                states[prompt.identifier] = prompt.enabled !== false;
+            }
+        }
+
+        return Object.keys(states).length > 0 ? states : null;
+    } catch (e) {
+        console.error(LOG_PREFIX, 'Error reading from context:', e);
+        return null;
+    }
 }
 
 /**
@@ -154,10 +202,10 @@ function applyPromptStates(config) {
     }
 
     for (const [identifier, enabled] of Object.entries(config)) {
-        const $row = $container.find(`.prompt_manager_prompt[data-pm-identifier="${identifier}"]`);
+        const $row = $container.find(`[data-pm-identifier="${identifier}"]`);
         if ($row.length === 0) continue;
 
-        const $checkbox = $row.find('input[type="checkbox"].prompt_manager_enabled');
+        const $checkbox = $row.find('input[type="checkbox"]').first();
         if ($checkbox.length === 0) continue;
 
         const currentState = $checkbox.prop('checked');
@@ -297,15 +345,20 @@ function injectUI() {
         </div>
     </div>`;
 
-    // Try to inject after the prompt manager or completion presets area
-    const $target = jQuery('#completion_prompt_manager');
-    if ($target.length > 0) {
-        $target.after(buttonBarHtml);
+    // Inject before the prompt entries list (条目列表前面)
+    const $list = jQuery('#completion_prompt_manager_list');
+    if ($list.length > 0) {
+        $list.before(buttonBarHtml);
     } else {
-        // Fallback: inject before the prompt list area
-        const $fallback = jQuery('#ai_response_configuration');
-        if ($fallback.length > 0) {
-            $fallback.prepend(buttonBarHtml);
+        // Fallback: try to inject before the prompt manager container
+        const $target = jQuery('#completion_prompt_manager');
+        if ($target.length > 0) {
+            $target.prepend(buttonBarHtml);
+        } else {
+            const $fallback = jQuery('#ai_response_configuration');
+            if ($fallback.length > 0) {
+                $fallback.prepend(buttonBarHtml);
+            }
         }
     }
 
@@ -358,9 +411,10 @@ jQuery(async () => {
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
 
     // Listen for prompt checkbox state changes via event delegation
+    // Use broad selector since ST may not use .prompt_manager_enabled class
     jQuery(document).on(
         'change',
-        '#completion_prompt_manager_list input[type="checkbox"].prompt_manager_enabled',
+        '#completion_prompt_manager_list [data-pm-identifier] input[type="checkbox"]',
         onPromptStateChanged
     );
 
