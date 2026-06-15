@@ -4,23 +4,42 @@
  * Uses chatMetadata for storage, auto-saves before generation, auto-restores on chat switch.
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.1.0
+ * @version 2.2.0
  * @license MIT
  */
 
 const EXTENSION_NAME = 'prompt-keeper';
 const LOG_PREFIX = '[PromptKeeper]';
 const METADATA_KEY = 'promptKeeperState';
+const SETTINGS_KEY = 'promptKeeperPluginSettings';
 
-// Capture the script's base path at load time (document.currentScript is only valid during initial script execution)
-const SCRIPT_BASE_PATH = (function () {
-    try {
-        if (document.currentScript && document.currentScript.src) {
-            return document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/'));
-        }
-    } catch (e) { /* ignore */ }
-    return '';
-})();
+// Default plugin settings
+const DEFAULT_SETTINGS = {
+    enabled: true, // 插件默认启动
+};
+
+// Settings panel HTML
+const SETTINGS_HTML = `
+<div id="prompt-keeper-settings" class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b>Prompt Keeper</b>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+    </div>
+    <div class="inline-drawer-content">
+        <div class="settings_section">
+            <label class="checkbox_label" for="pk-enabled-toggle">
+                <input type="checkbox" id="pk-enabled-toggle" checked />
+                <span>启用插件</span>
+            </label>
+        </div>
+        <hr class="sysHR" />
+        <div class="settings_section">
+            <label><strong>自动保存时机：</strong> 发送消息之前</label>
+            <label><strong>自动恢复时机：</strong> 切换到已保存配置的聊天时</label>
+        </div>
+    </div>
+</div>`;
+
 
 /**
  * Get current SillyTavern context
@@ -28,6 +47,40 @@ const SCRIPT_BASE_PATH = (function () {
  */
 function getCtx() {
     return SillyTavern.getContext();
+}
+
+/**
+ * Load plugin settings from extensionSettings
+ * @returns {object}
+ */
+function loadPluginSettings() {
+    const ctx = getCtx();
+    if (!ctx.extensionSettings) {
+        ctx.extensionSettings = {};
+    }
+    if (!ctx.extensionSettings[SETTINGS_KEY]) {
+        ctx.extensionSettings[SETTINGS_KEY] = Object.assign({}, DEFAULT_SETTINGS);
+    }
+    return ctx.extensionSettings[SETTINGS_KEY];
+}
+
+/**
+ * Save plugin settings
+ */
+function savePluginSettings() {
+    const ctx = getCtx();
+    if (ctx.saveSettingsDebounced) {
+        ctx.saveSettingsDebounced();
+    }
+}
+
+/**
+ * Check if plugin is enabled
+ * @returns {boolean}
+ */
+function isPluginEnabled() {
+    const settings = loadPluginSettings();
+    return settings.enabled !== false;
 }
 
 /**
@@ -144,8 +197,6 @@ function applyPromptStates(savedState) {
 
             // Apply prompt order if available
             if (savedOrder && Array.isArray(savedOrder) && oaiSettings.prompt_order && Array.isArray(oaiSettings.prompt_order)) {
-                // prompt_order structure: array of { character_id, order: [{identifier, enabled}] }
-                // Or it can be a simple array depending on ST version
                 if (savedOrder.length > 0 && typeof savedOrder[0] === 'object' && savedOrder[0].character_id !== undefined) {
                     // Full prompt_order structure
                     oaiSettings.prompt_order = JSON.parse(JSON.stringify(savedOrder));
@@ -243,6 +294,8 @@ function applyPromptStatesDOM(savedPrompts, skipped) {
  * @returns {boolean} Whether save was successful
  */
 function saveStatesToMetadata() {
+    if (!isPluginEnabled()) return false;
+
     const ctx = getCtx();
     const chatId = ctx.chatId;
 
@@ -274,6 +327,10 @@ function saveStatesToMetadata() {
 
     console.log(LOG_PREFIX, `Saved prompt states for chat: ${chatId}`, states.prompts);
     updateStatusDisplay(true);
+
+    // 保存成功弹窗通知
+    toastr.success('预设条目配置已保存成功！', 'Prompt Keeper', { timeOut: 3000 });
+
     return true;
 }
 
@@ -283,6 +340,8 @@ function saveStatesToMetadata() {
  * @returns {boolean}
  */
 function restoreStatesFromMetadata(silent = false) {
+    if (!isPluginEnabled()) return false;
+
     const ctx = getCtx();
     const chatId = ctx.chatId;
 
@@ -311,9 +370,8 @@ function restoreStatesFromMetadata(silent = false) {
     if (skipped.length > 0) {
         const msg = `以下条目在当前预设中不存在，已跳过：\n${skipped.join(', ')}`;
         console.warn(LOG_PREFIX, msg);
-        if (!silent) {
-            toastr.warning(msg, 'Prompt Keeper', { timeOut: 8000 });
-        }
+        // 用弹窗形式提醒而不是界面内的文字
+        toastr.warning(msg, 'Prompt Keeper - 恢复提醒', { timeOut: 8000 });
     }
 
     if (!silent) {
@@ -373,6 +431,7 @@ function hasSavedState() {
  * Handle GENERATION_STARTED event - auto save before sending
  */
 function onGenerationStarted() {
+    if (!isPluginEnabled()) return;
     console.debug(LOG_PREFIX, 'Generation started, auto-saving prompt states...');
     saveStatesToMetadata();
 }
@@ -381,6 +440,8 @@ function onGenerationStarted() {
  * Handle CHAT_CHANGED event - auto restore
  */
 function onChatChanged() {
+    if (!isPluginEnabled()) return;
+
     const ctx = getCtx();
     const chatId = ctx.chatId;
 
@@ -403,6 +464,9 @@ function onChatChanged() {
 
 // ========== UI ==========
 
+/** MutationObserver instance for monitoring UI removal */
+let uiObserver = null;
+
 /**
  * Update status display
  * @param {boolean} hasSave
@@ -416,6 +480,33 @@ function updateStatusDisplay(hasSave) {
     } else {
         $status.text('⚠ 无保存').removeClass('pk-saved').addClass('pk-not-saved');
     }
+}
+
+/**
+ * Start observing the UI bar for removal, re-inject if it disappears
+ */
+function startUIObserver() {
+    if (uiObserver) {
+        uiObserver.disconnect();
+    }
+
+    uiObserver = new MutationObserver(() => {
+        if (jQuery('#prompt-keeper-bar').length === 0) {
+            console.debug(LOG_PREFIX, 'UI bar disappeared, re-injecting...');
+            // Small delay to avoid conflicts with ongoing DOM updates
+            setTimeout(() => {
+                if (jQuery('#prompt-keeper-bar').length === 0) {
+                    injectUI();
+                }
+            }, 300);
+        }
+    });
+
+    // Observe the body for childList changes in the subtree
+    uiObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
 }
 
 /**
@@ -445,14 +536,55 @@ function injectUI() {
 
     let injected = false;
 
-    // Strategy 1: Insert after the prompt manager list
-    const $list = jQuery('#completion_prompt_manager_list');
-    if ($list.length > 0) {
-        $list.after(buttonBarHtml);
-        injected = true;
+    // Strategy 1: Insert between Top P and Quick Prompt Editor
+    if (!injected) {
+        const $quickPromptDrawer = jQuery('#quick_prompts_container, #quickPromptEditor, #quick-prompts-inline-drawer').first();
+        if ($quickPromptDrawer.length > 0) {
+            $quickPromptDrawer.before(buttonBarHtml);
+            injected = true;
+        }
     }
 
-    // Strategy 2: Insert in AI response configuration area
+    // Strategy 2: Find by searching inline-drawer headers for prompt-related text
+    if (!injected) {
+        jQuery('.inline-drawer-header').each(function () {
+            if (injected) return;
+            const text = jQuery(this).text().trim();
+            if (text.match(/快速提示词|Quick Prompt|Prompt Editor/i)) {
+                const $drawer = jQuery(this).closest('.inline-drawer');
+                if ($drawer.length > 0) {
+                    $drawer.before(buttonBarHtml);
+                    injected = true;
+                }
+            }
+        });
+    }
+
+    // Strategy 3: Insert after Top P range block
+    if (!injected) {
+        const $topP = jQuery('#top_p_block, [data-param="top_p"], #range_block_top_p').first();
+        if ($topP.length > 0) {
+            const $block = $topP.closest('.range-block, .range_block, .completions_block_inner');
+            if ($block.length > 0) {
+                $block.after(buttonBarHtml);
+                injected = true;
+            } else {
+                $topP.after(buttonBarHtml);
+                injected = true;
+            }
+        }
+    }
+
+    // Strategy 4: Insert after the prompt manager list (original fallback)
+    if (!injected) {
+        const $list = jQuery('#completion_prompt_manager_list');
+        if ($list.length > 0) {
+            $list.after(buttonBarHtml);
+            injected = true;
+        }
+    }
+
+    // Strategy 5: Insert in AI response configuration area
     if (!injected) {
         const $aiConfig = jQuery('#ai_response_configuration');
         if ($aiConfig.length > 0) {
@@ -461,7 +593,7 @@ function injectUI() {
         }
     }
 
-    // Strategy 3: Insert in openai settings
+    // Strategy 6: Insert in openai settings
     if (!injected) {
         const $openai = jQuery('#openai_settings');
         if ($openai.length > 0) {
@@ -478,6 +610,13 @@ function injectUI() {
     // Bind events
     jQuery('#prompt-keeper-restore').on('click', () => restoreStatesFromMetadata());
     jQuery('#prompt-keeper-delete').on('click', () => deleteStateFromMetadata());
+
+    // Refresh status display
+    if (hasSavedState()) {
+        updateStatusDisplay(true);
+    } else {
+        updateStatusDisplay(false);
+    }
 
     console.log(LOG_PREFIX, 'UI injected successfully.');
 }
@@ -500,28 +639,28 @@ function tryInjectUI(maxRetries = 15, interval = 1000) {
 
 /**
  * Load settings panel
- * Uses fetch with the extension's own base path (captured at load time) to avoid directory name mismatch issues.
  */
-async function loadSettingsPanel() {
-    try {
-        if (SCRIPT_BASE_PATH) {
-            const response = await fetch(`${SCRIPT_BASE_PATH}/settings.html`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            const settingsHtml = await response.text();
-            jQuery('#extensions_settings2').append(settingsHtml);
-            console.log(LOG_PREFIX, 'Settings panel loaded via fetch.');
+function loadSettingsPanel() {
+    if (jQuery('#prompt-keeper-settings').length > 0) return;
+    jQuery('#extensions_settings2').append(SETTINGS_HTML);
+
+    // Load saved setting and apply to checkbox
+    const settings = loadPluginSettings();
+    jQuery('#pk-enabled-toggle').prop('checked', settings.enabled !== false);
+
+    // Bind toggle event
+    jQuery('#pk-enabled-toggle').on('change', function () {
+        const settings = loadPluginSettings();
+        settings.enabled = jQuery(this).prop('checked');
+        savePluginSettings();
+        if (settings.enabled) {
+            toastr.success('Prompt Keeper 已启用', 'Prompt Keeper');
         } else {
-            // Fallback: try renderExtensionTemplateAsync (works if folder name matches EXTENSION_NAME)
-            const ctx = getCtx();
-            const settingsHtml = await ctx.renderExtensionTemplateAsync(EXTENSION_NAME, 'settings');
-            jQuery('#extensions_settings2').append(settingsHtml);
-            console.log(LOG_PREFIX, 'Settings panel loaded via renderExtensionTemplateAsync.');
+            toastr.info('Prompt Keeper 已禁用', 'Prompt Keeper');
         }
-    } catch (e) {
-        console.error(LOG_PREFIX, 'Failed to load settings panel:', e);
-    }
+    });
+
+    console.log(LOG_PREFIX, 'Settings panel loaded (inline HTML).');
 }
 
 // ========== Main Init ==========
@@ -529,7 +668,7 @@ async function loadSettingsPanel() {
 (function init() {
     const ctx = getCtx();
     const eventSource = ctx.eventSource;
-    const eventTypes = ctx.eventTypes;
+    const eventTypes = ctx.event_types;
 
     // Wait for APP_READY before performing DOM operations
     eventSource.on(eventTypes.APP_READY, () => {
@@ -539,6 +678,9 @@ async function loadSettingsPanel() {
         // Inject UI
         tryInjectUI();
 
+        // Start observing for UI disappearance
+        startUIObserver();
+
         // Initial status check
         if (hasSavedState()) {
             updateStatusDisplay(true);
@@ -546,7 +688,7 @@ async function loadSettingsPanel() {
             updateStatusDisplay(false);
         }
 
-        console.log(LOG_PREFIX, 'Plugin v2.1.0 initialized (APP_READY).');
+        console.log(LOG_PREFIX, 'Plugin v2.2.0 initialized (APP_READY).');
     });
 
     // Listen for generation start (auto-save before sending)
@@ -558,5 +700,5 @@ async function loadSettingsPanel() {
         onChatChanged();
     });
 
-    console.log(LOG_PREFIX, 'Plugin v2.1.0 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v2.2.0 loaded, waiting for APP_READY...');
 })();

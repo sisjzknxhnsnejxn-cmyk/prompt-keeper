@@ -7,16 +7,10 @@
 
     <div class="inline-drawer-content">
         <div class="settings_section">
-            <p class="pk-description">
-                自动在发送消息前保存预设条目（Prompt Manager）的开关状态和排列顺序，并在切换聊天时自动恢复。
-            </p>
-        </div>
-
-        <hr class="sysHR" />
-
-        <div class="settings_section">
-            <label><strong>存储位置：</strong> 聊天元数据 (chatMetadata)</label>
-            <small>每个聊天独立保存，跟随聊天记录。</small>
+            <label class="checkbox_label" for="pk-enabled-toggle">
+                <input type="checkbox" id="pk-enabled-toggle" checked />
+                <span>启用插件</span>
+            </label>
         </div>
 
         <hr class="sysHR" />
@@ -24,15 +18,6 @@
         <div class="settings_section">
             <label><strong>自动保存时机：</strong> 发送消息之前</label>
             <label><strong>自动恢复时机：</strong> 切换到已保存配置的聊天时</label>
-        </div>
-
-        <hr class="sysHR" />
-
-        <div class="settings_section">
-            <small>
-                💡 提示：如果恢复时有条目在当前预设中不存在，会跳过并显示提醒。
-                你也可以使用界面上的"恢复"和"删除"按钮手动操作。
-            </small>
         </div>
     </div>
 </div>

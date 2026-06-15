@@ -53,12 +53,6 @@
 }
 
 /* Settings panel */
-#prompt-keeper-settings .pk-description {
-    font-size: 0.9em;
-    color: var(--SmartThemeBodyColor, #aaa);
-    margin: 4px 0;
-}
-
 #prompt-keeper-settings .settings_section {
     padding: 4px 0;
 }
@@ -69,7 +63,16 @@
     font-size: 0.9em;
 }
 
-#prompt-keeper-settings .settings_section small {
-    color: var(--SmartThemeBodyColor, #999);
-    font-size: 0.85em;
+#prompt-keeper-settings .settings_section .checkbox_label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.95em;
+}
+
+#prompt-keeper-settings .settings_section .checkbox_label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
