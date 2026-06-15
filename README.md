@@ -1,127 +1,150 @@
 # Prompt Keeper
 
-A [SillyTavern](https://github.com/SillyTavern/SillyTavern) plugin that saves and restores Prompt Manager entry states per chat session.
+一个 [SillyTavern](https://github.com/SillyTavern/SillyTavern) 插件，用于按聊天会话保存和恢复 Prompt Manager 条目状态（启用/禁用 + 排序）及当前活跃预设。
 
-## Features
+## 功能特性
 
-- **Per-Chat Configuration** — Each chat session remembers its own set of enabled/disabled prompt entries.
-- **Auto-Save** — Prompt entry states are automatically saved when you toggle checkboxes.
-- **Auto-Restore** — When switching chats, saved prompt configurations are automatically restored.
-- **Multiple Restore Modes** — Choose between Auto Restore, Ask Before Restore, or Notify Only.
-- **Integrated UI** — Save, Restore, and Delete buttons injected directly near the Prompt Manager area.
-- **Status Display** — Visual indicator showing whether the current chat has a saved configuration.
+- **按聊天独立配置** — 每个聊天会话记住自己的预设条目启用/禁用状态和排列顺序
+- **预设联动** — 保存时记录当前使用的预设名称，恢复时自动切换到对应预设
+- **手动保存** — 通过界面按钮手动保存，避免误操作
+- **自动恢复** — 切换聊天时自动恢复已保存的配置（带防抖机制）
+- **脏检查** — 恢复前对比当前状态与保存状态，避免不必要的重复操作
+- **集成 UI** — 保存/恢复/删除按钮直接注入到设置面板中
+- **状态指示** — 可视化显示当前聊天是否存在已保存的配置
 
-## How It Works
+## 工作原理
 
-When you enable or disable prompt entries in the Prompt Manager, Prompt Keeper automatically records the state of each entry tied to the current chat's unique ID. When you switch to a different chat, the plugin detects the `CHAT_CHANGED` event and restores the previously saved prompt configuration.
+当你点击保存按钮时，插件会读取 Prompt Manager 中所有条目的启用/禁用状态、排列顺序以及当前激活的预设名称，并将这些信息存储到当前聊天的 `chatMetadata` 中。
 
-### Data Storage
+切换到其他聊天时，插件检测 `CHAT_CHANGED` 事件，经过防抖延迟后自动恢复之前保存的配置——包括切换到对应预设并还原条目状态。
 
-All data is stored in SillyTavern's native `extension_settings.promptKeeper`:
+### 数据存储
+
+数据存储在聊天元数据 `chatMetadata.promptKeeperState` 中：
 
 ```json
 {
-    "restoreMode": "auto",
-    "configs": {
-        "chatId_123": {
-            "main": true,
-            "jailbreak": true,
-            "persona_description": false
-        }
-    }
+    "prompts": {
+        "main": true,
+        "jailbreak": true,
+        "persona_description": false
+    },
+    "promptOrder": [...],
+    "presetName": "My Preset",
+    "savedAt": 1718451600000
 }
 ```
 
-## Installation
+### 读取策略
 
-### Method 1: Via SillyTavern Extension Installer
+插件优先通过 API 层（`chatCompletionSettings`）读取和写入条目状态，如果 API 不可用则回退到 DOM 操作。
 
-1. Open SillyTavern
-2. Go to **Extensions** panel → **Install Extension**
-3. Paste the repository URL:
+## 安装
+
+### 方法一：通过 SillyTavern 扩展安装器
+
+1. 打开 SillyTavern
+2. 进入 **扩展面板** → **安装扩展**
+3. 粘贴仓库地址：
    ```
    https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper
    ```
-4. Click **Install**
-5. Reload SillyTavern
+4. 点击 **安装**
+5. 重新加载 SillyTavern
 
-### Method 2: Manual Installation
+### 方法二：手动安装
 
-1. Navigate to your SillyTavern installation directory
-2. Go to `data/<user-handle>/extensions/`
-3. Clone this repository:
+1. 进入 SillyTavern 安装目录
+2. 导航到 `data/<user-handle>/extensions/`
+3. 克隆本仓库：
    ```bash
    git clone https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper
    ```
-4. Restart SillyTavern
+4. 重启 SillyTavern
 
-## Usage
+## 使用方法
 
-### Buttons (located near the Prompt Manager)
+### 操作按钮（位于设置面板中）
 
-| Button | Action |
-|--------|--------|
-| 💾 **Save** | Immediately save the current prompt entry states for this chat |
-| ↺ **Restore** | Manually restore the saved configuration for this chat |
-| 🗑 **Delete** | Delete the saved configuration for this chat |
+| 按钮 | 功能 |
+|------|------|
+| 💾 **保存** | 保存当前预设条目的启用状态、排序和预设名称 |
+| ↺ **恢复** | 手动恢复已保存的配置（包括切换预设） |
+| 🗑 **删除** | 删除当前聊天的保存配置 |
 
-### Restore Modes (configurable in Extensions Settings)
+### 插件设置（扩展设置面板）
 
-| Mode | Behavior |
-|------|----------|
-| **Auto Restore** | Automatically applies saved config when switching chats |
-| **Ask Before Restore** | Shows a confirmation dialog before restoring |
-| **Notify Only** | Displays a notification that a saved config exists |
+| 选项 | 说明 |
+|------|------|
+| **启用插件** | 控制插件整体开关 |
+| **切换聊天时自动恢复** | 开启后切换聊天会自动恢复配置，关闭则需手动恢复 |
 
-### Status Indicator
+### 状态指示器
 
-- `✓ Saved (Last: 2025-01-15 14:30)` — Configuration saved for this chat
-- `⚠ Not Saved` — No saved configuration for this chat
+- `✓ 已保存` — 当前聊天存在已保存的预设条目配置
+- `⚠ 无保存` — 当前聊天没有保存的配置
 
-## Scope
+### 自动恢复机制
 
-Prompt Keeper **only** manages Prompt Entry enabled/disabled states.
+开启自动恢复后，切换聊天时插件会：
 
-It does **NOT** manage:
-- Model selection
-- API settings
+1. 等待 1.5 秒防抖延迟（避免快速切换时重复触发）
+2. 执行脏检查，对比当前状态与保存状态
+3. 如果保存了不同的预设，先切换预设
+4. 等待预设加载完成后，恢复条目启用/禁用状态和排序
+
+## 管理范围
+
+Prompt Keeper **管理**：
+- Prompt 条目的启用/禁用状态
+- Prompt 条目的排列顺序
+- 当前使用的预设名称
+
+**不管理**：
+- 模型选择
+- API 设置
 - Temperature / Top P
-- Instruct Presets
-- Context Templates
-- Generation Settings
+- Instruct 预设
+- 上下文模板
+- 生成参数
 
-## Requirements
+## 系统要求
 
-- SillyTavern 1.12.0 or later (with Prompt Manager support)
+- SillyTavern 1.12.0 或更高版本（需支持 Prompt Manager）
 
-## Changelog
+## 更新日志
 
 ### v1.0.0
 
-- Initial release
-- Per-chat prompt entry state saving and restoration
-- Three restore modes: auto, ask, notify
-- Integrated UI with Save/Restore/Delete buttons
-- Auto-save on prompt checkbox changes
-- Status display with last save timestamp
+- 初始发布
+- 按聊天保存预设条目状态（启用/禁用 + 排序）
+- 保存并恢复活跃预设名称
+- 切换聊天时自动恢复（带防抖 + 脏检查）
+- 集成 UI：保存/恢复/删除按钮
+- 状态指示器
+- API 层优先读写，DOM 回退兜底
+- MutationObserver 监控 UI 移除并自动重新注入
 
-## FAQ
+## 常见问题
 
-**Q: Where is the data stored?**
-A: In SillyTavern's native `extension_settings` under the key `promptKeeper`. It is saved alongside your other extension settings.
+**Q: 数据保存在哪里？**
+A: 保存在当前聊天的 `chatMetadata` 中，跟随聊天文件一起存储。
 
-**Q: What happens if I delete a chat?**
-A: The saved configuration for that chat remains in settings. You can manually clean it up, or it will simply be unused.
+**Q: 删除聊天后配置会怎样？**
+A: 配置随聊天一起被删除，无需手动清理。
 
-**Q: Does this affect other users or characters?**
-A: No. Configurations are bound to chat IDs, not characters or users. Each unique chat session has its own independent configuration.
+**Q: 会影响其他用户或角色吗？**
+A: 不会。配置绑定到聊天 ID，每个聊天会话独立。
 
-**Q: Will this conflict with other extensions?**
-A: Prompt Keeper uses non-invasive DOM event delegation and does not modify SillyTavern core files. Conflicts are unlikely.
+**Q: 会和其他扩展冲突吗？**
+A: Prompt Keeper 使用事件委托和非侵入式 DOM 操作，不修改 SillyTavern 核心文件，冲突可能性很低。
 
-**Q: Can I disable auto-save?**
-A: Auto-save is always active when prompt checkboxes change. You can use the manual Save button if you prefer explicit control, and choose "Notify Only" mode to prevent auto-restore.
+**Q: 为什么恢复时提示某些条目被跳过？**
+A: 如果保存时存在的条目在当前预设中不存在（比如切换了预设后条目列表不同），这些条目会被跳过并提示。
 
-## License
+**Q: 可以关闭自动恢复吗？**
+A: 可以。在扩展设置面板中取消勾选「切换聊天时自动恢复」即可，之后需要手动点击恢复按钮。
 
-MIT License — see [LICENSE](LICENSE) for details.
+## 许可证
+
+MIT License — 详见 [LICENSE](LICENSE)。

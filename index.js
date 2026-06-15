@@ -4,7 +4,7 @@
  * Uses chatMetadata for storage. Manual save, auto-restore on chat switch with debounce + dirty check.
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.5.0
+ * @version 1.0.0
  * @license MIT
  */
 
@@ -959,7 +959,7 @@ function loadSettingsPanel() {
         // Initial status check
         updateStatusDisplay(hasSavedState());
 
-        console.log(LOG_PREFIX, 'Plugin v2.5.0 initialized (APP_READY).');
+        console.log(LOG_PREFIX, 'Plugin v1.0.0 initialized (APP_READY).');
     });
 
     // Listen for chat change (update status + debounced auto-restore)
@@ -968,5 +968,5 @@ function loadSettingsPanel() {
         onChatChanged();
     });
 
-    console.log(LOG_PREFIX, 'Plugin v2.5.0 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v1.0.0 loaded, waiting for APP_READY...');
 })();
