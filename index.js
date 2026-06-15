@@ -18,6 +18,7 @@
 
 import { extension_settings, getContext } from '../../../extensions.js';
 import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
+import { saveChatDebounced } from '../../../../chat.js';
 
 // ============================================================
 // 常量定义
@@ -285,11 +286,9 @@ function saveConfig(showToast = false) {
         version: 3,
     };
 
-    // 保存聊天元数据
-    if (typeof window.saveMetadataDebounced === 'function') {
-        window.saveMetadataDebounced();
-    } else if (typeof saveMetadataDebounced === 'function') {
-        saveMetadataDebounced();
+    // 写入底层的聊天文件 (.jsonl)
+    if (typeof saveChatDebounced === 'function') {
+        saveChatDebounced();
     }
 
     console.log(`${LOG_PREFIX} Saved config for chat: ${chatId} (${states.length} entries)`);
@@ -369,10 +368,9 @@ function deleteConfig() {
     }
 
     delete metadata[MODULE_NAME];
-    if (typeof window.saveMetadataDebounced === 'function') {
-        window.saveMetadataDebounced();
-    } else if (typeof saveMetadataDebounced === 'function') {
-        saveMetadataDebounced();
+    // 写入底层的聊天文件 (.jsonl)
+    if (typeof saveChatDebounced === 'function') {
+        saveChatDebounced();
     }
 
     console.log(`${LOG_PREFIX} Deleted config for chat: ${chatId}`);
