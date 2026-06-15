@@ -1,10 +1,10 @@
 /**
  * Prompt Keeper - SillyTavern Plugin
  * Saves and restores Prompt Manager entry states (enabled + order) AND the active preset per chat session.
- * Uses chatMetadata for storage, auto-saves before generation, auto-restores on chat switch.
+ * Uses chatMetadata for storage. Manual save, auto-restore on chat switch with debounce + dirty check.
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.3.0
+ * @version 2.5.0
  * @license MIT
  */
 
@@ -16,6 +16,8 @@ const SETTINGS_KEY = 'promptKeeperPluginSettings';
 // Default plugin settings
 const DEFAULT_SETTINGS = {
     enabled: true, // 插件默认启动
+    autoRestore: true, // 切换聊天时自动恢复
+    autoRestoreDelay: 1500, // 防抖延迟（毫秒）
 };
 
 // Settings panel HTML
@@ -31,15 +33,22 @@ const SETTINGS_HTML = `
                 <input type="checkbox" id="pk-enabled-toggle" checked />
                 <span>启用插件</span>
             </label>
+            <label class="checkbox_label" for="pk-auto-restore-toggle">
+                <input type="checkbox" id="pk-auto-restore-toggle" checked />
+                <span>切换聊天时自动恢复</span>
+            </label>
         </div>
         <hr class="sysHR" />
         <div class="settings_section">
-            <label><strong>自动保存时机：</strong> 发送消息之前</label>
-            <label><strong>自动恢复时机：</strong> 切换到已保存配置的聊天时</label>
+            <label><strong>保存方式：</strong> 手动点击保存按钮</label>
+            <label><strong>恢复方式：</strong> 自动（切换聊天时延迟恢复）或手动</label>
+            <label><strong>保存位置：</strong> 当前聊天的元数据中</label>
         </div>
     </div>
 </div>`;
 
+/** Debounce timer for auto-restore */
+let autoRestoreTimer = null;
 
 /**
  * Get current SillyTavern context
@@ -61,7 +70,11 @@ function loadPluginSettings() {
     if (!ctx.extensionSettings[SETTINGS_KEY]) {
         ctx.extensionSettings[SETTINGS_KEY] = Object.assign({}, DEFAULT_SETTINGS);
     }
-    return ctx.extensionSettings[SETTINGS_KEY];
+    // Ensure new settings fields have defaults for existing installs
+    const settings = ctx.extensionSettings[SETTINGS_KEY];
+    if (settings.autoRestore === undefined) settings.autoRestore = DEFAULT_SETTINGS.autoRestore;
+    if (settings.autoRestoreDelay === undefined) settings.autoRestoreDelay = DEFAULT_SETTINGS.autoRestoreDelay;
+    return settings;
 }
 
 /**
@@ -81,6 +94,15 @@ function savePluginSettings() {
 function isPluginEnabled() {
     const settings = loadPluginSettings();
     return settings.enabled !== false;
+}
+
+/**
+ * Check if auto-restore is enabled
+ * @returns {boolean}
+ */
+function isAutoRestoreEnabled() {
+    const settings = loadPluginSettings();
+    return settings.enabled !== false && settings.autoRestore !== false;
 }
 
 /**
@@ -163,6 +185,60 @@ function readPromptStatesFromDOM() {
 
     console.debug(LOG_PREFIX, 'Read prompt states from DOM fallback');
     return { prompts, promptOrder: orderArray };
+}
+
+/**
+ * Dirty check: compare current state with saved state to determine if restore is needed.
+ * Returns an object indicating what needs to change.
+ * @param {object} savedState - The saved state from chatMetadata
+ * @returns {{ needsPresetSwitch: boolean, needsEntryRestore: boolean, targetPreset: string|null }}
+ */
+function checkDirtyState(savedState) {
+    const result = {
+        needsPresetSwitch: false,
+        needsEntryRestore: false,
+        targetPreset: null,
+    };
+
+    if (!savedState || !savedState.prompts) return result;
+
+    // Check preset
+    if (savedState.presetName) {
+        const currentPreset = getCurrentPresetName();
+        if (currentPreset && currentPreset !== savedState.presetName) {
+            result.needsPresetSwitch = true;
+            result.targetPreset = savedState.presetName;
+        }
+    }
+
+    // Check entry states (only if same preset or no preset switch needed)
+    if (!result.needsPresetSwitch) {
+        const currentStates = readPromptStates();
+        if (currentStates && currentStates.prompts) {
+            for (const [identifier, enabled] of Object.entries(savedState.prompts)) {
+                if (currentStates.prompts[identifier] !== undefined && currentStates.prompts[identifier] !== enabled) {
+                    result.needsEntryRestore = true;
+                    break;
+                }
+            }
+            // Also check order if entries match
+            if (!result.needsEntryRestore && savedState.promptOrder && currentStates.promptOrder) {
+                const savedOrderStr = JSON.stringify(savedState.promptOrder);
+                const currentOrderStr = JSON.stringify(currentStates.promptOrder);
+                if (savedOrderStr !== currentOrderStr) {
+                    result.needsEntryRestore = true;
+                }
+            }
+        } else {
+            // Can't read current state, assume we need restore
+            result.needsEntryRestore = true;
+        }
+    } else {
+        // If preset is different, entries will definitely need restore after switch
+        result.needsEntryRestore = true;
+    }
+
+    return result;
 }
 
 /**
@@ -317,7 +393,8 @@ function getCurrentPresetName() {
 }
 
 /**
- * Switch to a named preset using STScript /preset command
+ * Switch to a named preset by manipulating the preset selector DOM element
+ * and falling back to slash commands if DOM approach fails.
  * @param {string} presetName - The preset name to switch to
  * @returns {Promise<boolean>} Whether the switch was successful
  */
@@ -331,30 +408,64 @@ async function switchToPreset(presetName) {
         return true;
     }
 
+    // Strategy 1: DOM selector approach (most reliable)
+    try {
+        const $select = jQuery('#settings_preset_openai, #settings_preset').first();
+        if ($select.length > 0) {
+            let matched = false;
+            $select.find('option').each(function () {
+                const $opt = jQuery(this);
+                const optText = $opt.text().trim();
+                const optVal = $opt.val();
+                if (optText === presetName || optVal === presetName) {
+                    $select.val($opt.val()).trigger('change');
+                    matched = true;
+                    return false; // break
+                }
+            });
+            if (matched) {
+                console.log(LOG_PREFIX, `Switched preset to "${presetName}" via DOM selector.`);
+                return true;
+            }
+            console.debug(LOG_PREFIX, `Preset "${presetName}" not found in selector options.`);
+        }
+    } catch (e) {
+        console.warn(LOG_PREFIX, 'DOM selector approach failed:', e);
+    }
+
+    // Strategy 2: Slash command with properly quoted name
     try {
         const ctx = getCtx();
-        // Use executeSlashCommandsWithOptions to run /preset command
+        const escapedName = presetName.replace(/"/g, '\\"');
         if (ctx.executeSlashCommandsWithOptions) {
-            const result = await ctx.executeSlashCommandsWithOptions(`/preset ${presetName}`);
+            const result = await ctx.executeSlashCommandsWithOptions(`/preset "${escapedName}"`);
             console.log(LOG_PREFIX, `Switched preset to "${presetName}" via /preset command`, result);
-            return true;
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const afterPreset = getCurrentPresetName();
+            if (afterPreset === presetName) {
+                return true;
+            }
+            console.warn(LOG_PREFIX, `Slash command ran but preset is "${afterPreset}" instead of "${presetName}"`);
         }
-        // Fallback: try executeSlashCommands
         if (ctx.executeSlashCommands) {
-            await ctx.executeSlashCommands(`/preset ${presetName}`);
+            await ctx.executeSlashCommands(`/preset "${escapedName}"`);
             console.log(LOG_PREFIX, `Switched preset to "${presetName}" via executeSlashCommands`);
-            return true;
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const afterPreset = getCurrentPresetName();
+            if (afterPreset === presetName) {
+                return true;
+            }
         }
-        console.warn(LOG_PREFIX, 'No slash command execution method available for preset switch.');
-        return false;
     } catch (e) {
-        console.error(LOG_PREFIX, `Failed to switch to preset "${presetName}":`, e);
-        return false;
+        console.warn(LOG_PREFIX, `Slash command approach failed for preset "${presetName}":`, e);
     }
+
+    console.error(LOG_PREFIX, `All strategies failed to switch to preset "${presetName}".`);
+    return false;
 }
 
 /**
- * Save current prompt states to chatMetadata
+ * Save current prompt states to chatMetadata (always shows notification)
  * @returns {boolean} Whether save was successful
  */
 function saveStatesToMetadata() {
@@ -364,20 +475,19 @@ function saveStatesToMetadata() {
     const chatId = ctx.chatId;
 
     if (!chatId) {
-        console.debug(LOG_PREFIX, 'No active chat, skip save.');
+        toastr.warning('没有活跃的聊天，无法保存。', 'Prompt Keeper');
         return false;
     }
 
     const states = readPromptStates();
     if (!states) {
-        console.debug(LOG_PREFIX, 'No prompt states to save.');
+        toastr.warning('未能读取预设条目状态，请确认预设管理器已加载。', 'Prompt Keeper');
         return false;
     }
 
-    // Directly modify chatMetadata (do NOT cache the reference long-term)
     const chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
-        console.debug(LOG_PREFIX, 'chatMetadata not available, skip save.');
+        toastr.warning('chatMetadata 不可用，无法保存。', 'Prompt Keeper');
         return false;
     }
 
@@ -396,7 +506,6 @@ function saveStatesToMetadata() {
     console.log(LOG_PREFIX, `Saved prompt states for chat: ${chatId}, preset: ${presetName}`, states.prompts);
     updateStatusDisplay(true);
 
-    // 保存成功弹窗通知
     toastr.success(`预设条目配置已保存成功！${presetName ? '（预设: ' + presetName + '）' : ''}`, 'Prompt Keeper', { timeOut: 3000 });
 
     return true;
@@ -405,7 +514,7 @@ function saveStatesToMetadata() {
 /**
  * Restore prompt states from chatMetadata
  * Handles preset switching (async) before restoring entry states.
- * @param {boolean} silent - If true, don't show toastr notifications
+ * @param {boolean} silent - If true, suppress success notification (used for auto-restore)
  * @returns {Promise<boolean>}
  */
 async function restoreStatesFromMetadata(silent = false) {
@@ -415,42 +524,44 @@ async function restoreStatesFromMetadata(silent = false) {
     const chatId = ctx.chatId;
 
     if (!chatId) {
-        console.debug(LOG_PREFIX, 'No active chat, skip restore.');
+        if (!silent) toastr.warning('没有活跃的聊天，无法恢复。', 'Prompt Keeper');
         return false;
     }
 
     const chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
-        console.debug(LOG_PREFIX, 'chatMetadata not available, skip restore.');
+        if (!silent) toastr.warning('chatMetadata 不可用，无法恢复。', 'Prompt Keeper');
         return false;
     }
 
     const savedState = chatMetadata[METADATA_KEY];
 
     if (!savedState || !savedState.prompts) {
-        if (!silent) {
-            toastr.info('当前聊天没有保存的预设条目配置。', 'Prompt Keeper');
-        }
+        if (!silent) toastr.info('当前聊天没有保存的预设条目配置。', 'Prompt Keeper');
         return false;
+    }
+
+    // Dirty check: skip restore if nothing changed
+    const dirty = checkDirtyState(savedState);
+    if (!dirty.needsPresetSwitch && !dirty.needsEntryRestore) {
+        console.debug(LOG_PREFIX, 'Dirty check passed: current state matches saved state, skipping restore.');
+        if (!silent) toastr.info('当前状态已与保存配置一致，无需恢复。', 'Prompt Keeper');
+        return true;
     }
 
     // Step 1: Switch preset if a different one was saved
     let presetSwitched = false;
-    if (savedState.presetName) {
-        const currentPreset = getCurrentPresetName();
-        if (currentPreset && currentPreset !== savedState.presetName) {
-            console.log(LOG_PREFIX, `Switching preset from "${currentPreset}" to "${savedState.presetName}"...`);
-            presetSwitched = await switchToPreset(savedState.presetName);
-            if (presetSwitched) {
-                // Wait a moment for the preset to fully load before applying entry states
-                await new Promise(resolve => setTimeout(resolve, 600));
-            } else {
-                const msg = `无法切换到保存的预设 "${savedState.presetName}"，将在当前预设上恢复条目状态。`;
-                console.warn(LOG_PREFIX, msg);
-                if (!silent) {
-                    toastr.warning(msg, 'Prompt Keeper', { timeOut: 5000 });
-                }
-            }
+    if (dirty.needsPresetSwitch) {
+        console.log(LOG_PREFIX, `Switching preset to "${dirty.targetPreset}"...`);
+        presetSwitched = await switchToPreset(dirty.targetPreset);
+        if (presetSwitched) {
+            // Wait a moment for the preset to fully load before applying entry states
+            await new Promise(resolve => setTimeout(resolve, 600));
+        } else {
+            const msg = `无法切换到保存的预设 "${dirty.targetPreset}"，条目恢复已跳过。`;
+            console.warn(LOG_PREFIX, msg);
+            if (!silent) toastr.warning(msg + '请手动切换预设后再尝试恢复。', 'Prompt Keeper', { timeOut: 5000 });
+            return false;
         }
     }
 
@@ -460,12 +571,15 @@ async function restoreStatesFromMetadata(silent = false) {
     if (skipped.length > 0) {
         const msg = `以下条目在当前预设中不存在，已跳过：\n${skipped.join(', ')}`;
         console.warn(LOG_PREFIX, msg);
-        toastr.warning(msg, 'Prompt Keeper - 恢复提醒', { timeOut: 8000 });
+        if (!silent) toastr.warning(msg, 'Prompt Keeper - 恢复提醒', { timeOut: 8000 });
     }
 
+    const presetInfo = presetSwitched ? `（已切换预设: ${dirty.targetPreset}）` : '';
     if (!silent) {
-        const presetInfo = presetSwitched ? `（已切换预设: ${savedState.presetName}）` : '';
         toastr.success(`预设条目配置已恢复。${presetInfo}`, 'Prompt Keeper');
+    } else {
+        // For auto-restore, show a brief non-intrusive notification
+        toastr.info(`已自动恢复预设条目配置。${presetInfo}`, 'Prompt Keeper', { timeOut: 2000 });
     }
 
     console.log(LOG_PREFIX, `Restored prompt states for chat: ${chatId}, preset switched: ${presetSwitched}`);
@@ -482,13 +596,13 @@ function deleteStateFromMetadata() {
     const chatId = ctx.chatId;
 
     if (!chatId) {
-        console.warn(LOG_PREFIX, 'No active chat, cannot delete.');
+        toastr.warning('没有活跃的聊天，无法删除。', 'Prompt Keeper');
         return false;
     }
 
     const chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
-        console.warn(LOG_PREFIX, 'chatMetadata not available, cannot delete.');
+        toastr.warning('chatMetadata 不可用，无法删除。', 'Prompt Keeper');
         return false;
     }
 
@@ -518,16 +632,7 @@ function hasSavedState() {
 // ========== Event Handlers ==========
 
 /**
- * Handle GENERATION_STARTED event - auto save before sending
- */
-function onGenerationStarted() {
-    if (!isPluginEnabled()) return;
-    console.debug(LOG_PREFIX, 'Generation started, auto-saving prompt states...');
-    saveStatesToMetadata();
-}
-
-/**
- * Handle CHAT_CHANGED event - auto restore (async to support preset switching)
+ * Handle CHAT_CHANGED event - update status display and trigger debounced auto-restore
  */
 function onChatChanged() {
     if (!isPluginEnabled()) return;
@@ -535,23 +640,58 @@ function onChatChanged() {
     const ctx = getCtx();
     const chatId = ctx.chatId;
 
+    // Cancel any pending auto-restore from previous chat switch
+    if (autoRestoreTimer) {
+        clearTimeout(autoRestoreTimer);
+        autoRestoreTimer = null;
+        console.debug(LOG_PREFIX, 'Cancelled pending auto-restore (new chat switch detected).');
+    }
+
     if (!chatId) {
         updateStatusDisplay(false);
         return;
     }
 
-    // Brief delay to let metadata load
-    setTimeout(async () => {
-        if (hasSavedState()) {
-            updateStatusDisplay(true);
-            const restored = await restoreStatesFromMetadata(true);
-            if (restored) {
-                toastr.info('预设条目配置已自动恢复。', 'Prompt Keeper', { timeOut: 3000 });
-            }
-        } else {
-            updateStatusDisplay(false);
+    // Brief delay to let metadata load, then update status and maybe auto-restore
+    setTimeout(() => {
+        const hasSave = hasSavedState();
+        updateStatusDisplay(hasSave);
+
+        // Trigger debounced auto-restore if enabled and has saved state
+        if (hasSave && isAutoRestoreEnabled()) {
+            scheduleAutoRestore();
         }
     }, 500);
+}
+
+/**
+ * Schedule a debounced auto-restore.
+ * If another chat switch happens within the delay window, this is cancelled.
+ */
+function scheduleAutoRestore() {
+    const settings = loadPluginSettings();
+    const delay = settings.autoRestoreDelay || 1500;
+
+    // Clear any existing timer
+    if (autoRestoreTimer) {
+        clearTimeout(autoRestoreTimer);
+    }
+
+    autoRestoreTimer = setTimeout(async () => {
+        autoRestoreTimer = null;
+
+        // Double-check conditions are still met
+        if (!isAutoRestoreEnabled()) return;
+        if (!hasSavedState()) return;
+
+        const ctx = getCtx();
+        if (!ctx.chatId) return;
+
+        console.log(LOG_PREFIX, `Auto-restore triggered for chat: ${ctx.chatId}`);
+        await restoreStatesFromMetadata(true); // silent mode
+    }, delay);
+
+    console.debug(LOG_PREFIX, `Auto-restore scheduled in ${delay}ms.`);
 }
 
 // ========== UI ==========
@@ -585,7 +725,6 @@ function startUIObserver() {
     uiObserver = new MutationObserver(() => {
         if (jQuery('#prompt-keeper-bar').length === 0) {
             console.debug(LOG_PREFIX, 'UI bar disappeared, re-injecting...');
-            // Small delay to avoid conflicts with ongoing DOM updates
             setTimeout(() => {
                 if (jQuery('#prompt-keeper-bar').length === 0) {
                     injectUI();
@@ -594,7 +733,6 @@ function startUIObserver() {
         }
     });
 
-    // Observe the body for childList changes in the subtree
     uiObserver.observe(document.body, {
         childList: true,
         subtree: true,
@@ -615,6 +753,10 @@ function injectUI() {
             <span id="prompt-keeper-status" class="pk-not-saved">⚠ 无保存</span>
         </div>
         <div id="prompt-keeper-btn-group" class="prompt-keeper-btn-group">
+            <button id="prompt-keeper-save" class="menu_button" title="保存当前预设条目配置">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>保存</span>
+            </button>
             <button id="prompt-keeper-restore" class="menu_button" title="恢复保存的预设条目配置">
                 <i class="fa-solid fa-rotate-left"></i>
                 <span>恢复</span>
@@ -700,15 +842,12 @@ function injectUI() {
     }
 
     // Bind events
-    jQuery('#prompt-keeper-restore').on('click', () => restoreStatesFromMetadata());
+    jQuery('#prompt-keeper-save').on('click', () => saveStatesToMetadata());
+    jQuery('#prompt-keeper-restore').on('click', () => restoreStatesFromMetadata(false));
     jQuery('#prompt-keeper-delete').on('click', () => deleteStateFromMetadata());
 
     // Refresh status display
-    if (hasSavedState()) {
-        updateStatusDisplay(true);
-    } else {
-        updateStatusDisplay(false);
-    }
+    updateStatusDisplay(hasSavedState());
 
     console.log(LOG_PREFIX, 'UI injected successfully.');
 }
@@ -736,11 +875,12 @@ function loadSettingsPanel() {
     if (jQuery('#prompt-keeper-settings').length > 0) return;
     jQuery('#extensions_settings2').append(SETTINGS_HTML);
 
-    // Load saved setting and apply to checkbox
+    // Load saved settings and apply to checkboxes
     const settings = loadPluginSettings();
     jQuery('#pk-enabled-toggle').prop('checked', settings.enabled !== false);
+    jQuery('#pk-auto-restore-toggle').prop('checked', settings.autoRestore !== false);
 
-    // Bind toggle event
+    // Bind toggle events
     jQuery('#pk-enabled-toggle').on('change', function () {
         const settings = loadPluginSettings();
         settings.enabled = jQuery(this).prop('checked');
@@ -749,6 +889,27 @@ function loadSettingsPanel() {
             toastr.success('Prompt Keeper 已启用', 'Prompt Keeper');
         } else {
             toastr.info('Prompt Keeper 已禁用', 'Prompt Keeper');
+            // Cancel pending auto-restore if plugin disabled
+            if (autoRestoreTimer) {
+                clearTimeout(autoRestoreTimer);
+                autoRestoreTimer = null;
+            }
+        }
+    });
+
+    jQuery('#pk-auto-restore-toggle').on('change', function () {
+        const settings = loadPluginSettings();
+        settings.autoRestore = jQuery(this).prop('checked');
+        savePluginSettings();
+        if (settings.autoRestore) {
+            toastr.success('自动恢复已启用', 'Prompt Keeper');
+        } else {
+            toastr.info('自动恢复已禁用，切换聊天后需手动恢复', 'Prompt Keeper');
+            // Cancel pending auto-restore
+            if (autoRestoreTimer) {
+                clearTimeout(autoRestoreTimer);
+                autoRestoreTimer = null;
+            }
         }
     });
 
@@ -774,23 +935,16 @@ function loadSettingsPanel() {
         startUIObserver();
 
         // Initial status check
-        if (hasSavedState()) {
-            updateStatusDisplay(true);
-        } else {
-            updateStatusDisplay(false);
-        }
+        updateStatusDisplay(hasSavedState());
 
-        console.log(LOG_PREFIX, 'Plugin v2.3.0 initialized (APP_READY).');
+        console.log(LOG_PREFIX, 'Plugin v2.5.0 initialized (APP_READY).');
     });
 
-    // Listen for generation start (auto-save before sending)
-    eventSource.on(eventTypes.GENERATION_STARTED, onGenerationStarted);
-
-    // Listen for chat change (auto-restore)
+    // Listen for chat change (update status + debounced auto-restore)
     eventSource.on(eventTypes.CHAT_CHANGED, () => {
         tryInjectUI(5, 500);
         onChatChanged();
     });
 
-    console.log(LOG_PREFIX, 'Plugin v2.3.0 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v2.5.0 loaded, waiting for APP_READY...');
 })();
