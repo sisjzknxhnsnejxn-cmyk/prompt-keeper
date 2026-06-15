@@ -12,6 +12,16 @@ const EXTENSION_NAME = 'prompt-keeper';
 const LOG_PREFIX = '[PromptKeeper]';
 const METADATA_KEY = 'promptKeeperState';
 
+// Capture the script's base path at load time (document.currentScript is only valid during initial script execution)
+const SCRIPT_BASE_PATH = (function () {
+    try {
+        if (document.currentScript && document.currentScript.src) {
+            return document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/'));
+        }
+    } catch (e) { /* ignore */ }
+    return '';
+})();
+
 /**
  * Get current SillyTavern context
  * @returns {object}
@@ -489,14 +499,26 @@ function tryInjectUI(maxRetries = 15, interval = 1000) {
 }
 
 /**
- * Load settings panel using renderExtensionTemplateAsync
+ * Load settings panel
+ * Uses fetch with the extension's own base path (captured at load time) to avoid directory name mismatch issues.
  */
 async function loadSettingsPanel() {
     try {
-        const ctx = getCtx();
-        const settingsHtml = await ctx.renderExtensionTemplateAsync(EXTENSION_NAME, 'settings');
-        jQuery('#extensions_settings2').append(settingsHtml);
-        console.log(LOG_PREFIX, 'Settings panel loaded.');
+        if (SCRIPT_BASE_PATH) {
+            const response = await fetch(`${SCRIPT_BASE_PATH}/settings.html`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            const settingsHtml = await response.text();
+            jQuery('#extensions_settings2').append(settingsHtml);
+            console.log(LOG_PREFIX, 'Settings panel loaded via fetch.');
+        } else {
+            // Fallback: try renderExtensionTemplateAsync (works if folder name matches EXTENSION_NAME)
+            const ctx = getCtx();
+            const settingsHtml = await ctx.renderExtensionTemplateAsync(EXTENSION_NAME, 'settings');
+            jQuery('#extensions_settings2').append(settingsHtml);
+            console.log(LOG_PREFIX, 'Settings panel loaded via renderExtensionTemplateAsync.');
+        }
     } catch (e) {
         console.error(LOG_PREFIX, 'Failed to load settings panel:', e);
     }
