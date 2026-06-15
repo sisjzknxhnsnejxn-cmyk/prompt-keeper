@@ -18,6 +18,9 @@
     border: 1px solid var(--SmartThemeBorderColor, #666);
     border-radius: 5px;
     background-color: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 /* 头部：标题 + 状态 */

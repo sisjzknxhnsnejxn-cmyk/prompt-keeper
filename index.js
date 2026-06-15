@@ -45,61 +45,41 @@ const SAVE_DEBOUNCE_DELAY = 800;
 // ============================================================
 
 /**
- * 获取当前所有 Prompt Entry 的状态
- * 通过 SillyTavern 内部数据结构读取 prompt_order
+ * 新版通用读取逻辑：直接从 UI 页面获取真实状态
+ * 不再依赖任何全局变量或 getContext()，直接盯着页面上渲染的 checkbox 读取。
+ * 兼容新旧版本的 Prompt Manager DOM 结构。
  * @returns {Array<{identifier: string, enabled: boolean}>|null}
  */
 function getPromptStates() {
     try {
-        const context = getContext();
-        if (!context) return null;
-
-        // 尝试通过 PromptManager 实例获取（ST 官方暴露的方式）
-        // ST 的 getContext() 通常会挂载 promptManager 或类似属性
-        let promptOrder = null;
-
-        // 方式 1: context 上的 promptManager
-        if (context.promptManager) {
-            const pm = context.promptManager;
-            if (typeof pm.getPromptOrder === 'function') {
-                promptOrder = pm.getPromptOrder();
-            } else if (pm.serviceSettings && Array.isArray(pm.serviceSettings.prompt_order)) {
-                promptOrder = pm.serviceSettings.prompt_order;
-            }
-        }
-
-        // 方式 2: 全局 oai_settings 中的 prompt_order
-        if (!promptOrder && window.oai_settings && Array.isArray(window.oai_settings.prompt_order)) {
-            promptOrder = _resolvePromptOrder(window.oai_settings.prompt_order, context);
-        }
-
-        // 方式 3: power_user 或其他全局设置对象
-        if (!promptOrder && window.power_user && Array.isArray(window.power_user.prompt_order)) {
-            promptOrder = _resolvePromptOrder(window.power_user.prompt_order, context);
-        }
-
-        if (!promptOrder || !Array.isArray(promptOrder)) {
+        // 查找所有 Prompt 管理面板的条目节点
+        // 通用选择器，兼容大部分新旧版本的 DOM 结构
+        const entries = document.querySelectorAll(
+            '.prompt_entry, [data-prompt-id], .prompt-manager-entry, .prompt_manager_prompt'
+        );
+        if (!entries || entries.length === 0) {
+            console.warn(`${LOG_PREFIX} No prompt entries found in DOM`);
             return null;
         }
 
-        // 标准化为 [{identifier, enabled}] 格式
         const states = [];
-        for (const item of promptOrder) {
-            if (!item || typeof item !== 'object') continue;
-            const identifier = item.identifier ?? item.name ?? item.id;
-            if (!identifier) continue;
+        entries.forEach(entry => {
+            // 获取 ID：优先 data-prompt-id，其次 data-pm-identifier，再次 id 属性
+            const id = entry.getAttribute('data-prompt-id')
+                    || entry.getAttribute('data-pm-identifier')
+                    || entry.dataset.identifier
+                    || entry.id;
+            // 查找 checkbox 开关
+            const checkbox = entry.querySelector('input[type="checkbox"]');
 
-            let enabled = true;
-            if ('enabled' in item) enabled = item.enabled !== false;
-            else if ('active' in item) enabled = item.active !== false;
-            else if ('disabled' in item) enabled = !item.disabled;
+            if (id && checkbox) {
+                states.push({ identifier: id, enabled: checkbox.checked });
+            }
+        });
 
-            states.push({ identifier, enabled });
-        }
-
-        return states; // 允许返回空数组，不因为没有条目而判定失败
+        return states.length > 0 ? states : null;
     } catch (e) {
-        console.error(`${LOG_PREFIX} Error reading prompt states:`, e);
+        console.error(`${LOG_PREFIX} UI-based read failed:`, e);
         return null;
     }
 }
