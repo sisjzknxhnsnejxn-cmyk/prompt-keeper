@@ -699,6 +699,9 @@ function scheduleAutoRestore() {
 /** MutationObserver instance for monitoring UI removal */
 let uiObserver = null;
 
+/** Flag to track if delegated event handlers are already bound */
+let eventsDelegated = false;
+
 /**
  * Update status display
  * @param {boolean} hasSave
@@ -715,27 +718,43 @@ function updateStatusDisplay(hasSave) {
 }
 
 /**
- * Start observing the UI bar for removal, re-inject if it disappears
+ * Start observing the UI bar for removal, re-inject if it disappears.
+ * Only observes the bar's direct parent to avoid triggering on unrelated DOM changes (e.g., toastr).
  */
 function startUIObserver() {
     if (uiObserver) {
         uiObserver.disconnect();
+        uiObserver = null;
     }
 
-    uiObserver = new MutationObserver(() => {
-        if (jQuery('#prompt-keeper-bar').length === 0) {
-            console.debug(LOG_PREFIX, 'UI bar disappeared, re-injecting...');
-            setTimeout(() => {
-                if (jQuery('#prompt-keeper-bar').length === 0) {
-                    injectUI();
+    const $bar = jQuery('#prompt-keeper-bar');
+    if ($bar.length === 0) return;
+
+    const parentNode = $bar[0].parentNode;
+    if (!parentNode) return;
+
+    uiObserver = new MutationObserver((mutations) => {
+        // Only react if our bar was actually removed
+        for (const mutation of mutations) {
+            for (const removed of mutation.removedNodes) {
+                if (removed.id === 'prompt-keeper-bar' || (removed.querySelector && removed.querySelector('#prompt-keeper-bar'))) {
+                    console.debug(LOG_PREFIX, 'UI bar was removed from DOM, re-injecting...');
+                    setTimeout(() => {
+                        if (jQuery('#prompt-keeper-bar').length === 0) {
+                            injectUI();
+                            // Re-attach observer to new parent
+                            startUIObserver();
+                        }
+                    }, 300);
+                    return;
                 }
-            }, 300);
+            }
         }
     });
 
-    uiObserver.observe(document.body, {
+    uiObserver.observe(parentNode, {
         childList: true,
-        subtree: true,
+        subtree: false,
     });
 }
 
@@ -841,10 +860,13 @@ function injectUI() {
         return;
     }
 
-    // Bind events
-    jQuery('#prompt-keeper-save').on('click', () => saveStatesToMetadata());
-    jQuery('#prompt-keeper-restore').on('click', () => restoreStatesFromMetadata(false));
-    jQuery('#prompt-keeper-delete').on('click', () => deleteStateFromMetadata());
+    // Use delegated events bound to document, only once
+    if (!eventsDelegated) {
+        jQuery(document).on('click', '#prompt-keeper-save', () => saveStatesToMetadata());
+        jQuery(document).on('click', '#prompt-keeper-restore', () => restoreStatesFromMetadata(false));
+        jQuery(document).on('click', '#prompt-keeper-delete', () => deleteStateFromMetadata());
+        eventsDelegated = true;
+    }
 
     // Refresh status display
     updateStatusDisplay(hasSavedState());
