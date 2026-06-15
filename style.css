@@ -1,106 +1,75 @@
-/* Prompt Keeper - Plugin Styles */
+/* Prompt Keeper Styles */
 
-/* Button bar container */
 .prompt-keeper-bar {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 10px;
-    margin: 10px 0;
+    gap: 6px;
+    padding: 8px 10px;
+    margin: 8px 0;
     border: 1px solid var(--SmartThemeBorderColor, #555);
-    border-radius: 5px;
+    border-radius: 6px;
     background-color: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
 }
 
-/* Header row */
 .prompt-keeper-header {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 0.9em;
-    font-weight: bold;
+    font-weight: 600;
+    color: var(--SmartThemeBodyColor, #ccc);
 }
 
-/* Button group */
+.prompt-keeper-header i {
+    color: var(--SmartThemeQuoteColor, #a8c8ff);
+}
+
 .prompt-keeper-btn-group {
     display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .prompt-keeper-btn-group .menu_button {
-    padding: 5px 10px;
-    font-size: 0.85em;
+    flex: 1;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-}
-
-.prompt-keeper-btn-group .menu_button i {
-    font-size: 1em;
-}
-
-/* Status display */
-#prompt-keeper-status {
+    padding: 4px 8px;
     font-size: 0.85em;
-    padding: 3px 8px;
-    border-radius: 3px;
-    white-space: nowrap;
 }
 
-#prompt-keeper-status.pk-saved {
-    color: var(--SmartThemeQuoteColor, #72d572);
-}
-
-#prompt-keeper-status.pk-not-saved {
-    color: var(--SmartThemeWarningColor, #f4a460);
-}
-
-/* Settings panel styles */
-.prompt-keeper-settings .pk-settings-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-
-.prompt-keeper-settings .pk-settings-desc {
-    font-size: 0.9em;
-    opacity: 0.8;
-    margin: 0 0 10px 0;
-}
-
-.prompt-keeper-settings .pk-radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-left: 5px;
-}
-
-.prompt-keeper-settings .pk-radio-group .radio_label {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    flex-wrap: wrap;
-    cursor: pointer;
-}
-
-.prompt-keeper-settings .pk-radio-hint {
-    display: block;
+/* Status indicators */
+.pk-saved {
+    color: var(--SmartThemeQuoteColor, #7c7);
     font-size: 0.8em;
-    opacity: 0.7;
-    margin-left: 22px;
-    width: 100%;
+    margin-left: auto;
 }
 
-.prompt-keeper-settings .pk-info {
-    margin-top: 8px;
-    opacity: 0.7;
+.pk-not-saved {
+    color: var(--SmartThemeEmColor, #fa0);
+    font-size: 0.8em;
+    margin-left: auto;
 }
 
-.prompt-keeper-settings .pk-info small {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+/* Settings panel */
+#prompt-keeper-settings .pk-description {
+    font-size: 0.9em;
+    color: var(--SmartThemeBodyColor, #aaa);
+    margin: 4px 0;
+}
+
+#prompt-keeper-settings .settings_section {
+    padding: 4px 0;
+}
+
+#prompt-keeper-settings .settings_section label {
+    display: block;
+    margin: 2px 0;
+    font-size: 0.9em;
+}
+
+#prompt-keeper-settings .settings_section small {
+    color: var(--SmartThemeBodyColor, #999);
+    font-size: 0.85em;
 }

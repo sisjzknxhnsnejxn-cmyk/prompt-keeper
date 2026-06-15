@@ -1,43 +1,38 @@
-<div class="prompt-keeper-settings">
-    <div class="inline-drawer">
-        <div class="inline-drawer-toggle inline-drawer-header">
-            <b>Prompt Keeper</b>
-            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+<!-- Prompt Keeper Settings Panel -->
+<div id="prompt-keeper-settings" class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b>Prompt Keeper</b>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+    </div>
+
+    <div class="inline-drawer-content">
+        <div class="settings_section">
+            <p class="pk-description">
+                自动在发送消息前保存预设条目（Prompt Manager）的开关状态和排列顺序，并在切换聊天时自动恢复。
+            </p>
         </div>
-        <div class="inline-drawer-content">
-            <div class="prompt-keeper-settings-inner">
-                <label class="pk-settings-label">
-                    <i class="fa-solid fa-rotate-left"></i>
-                    <span data-i18n="Restore Mode">Restore Mode</span>
-                </label>
-                <p class="pk-settings-desc">
-                    Choose how Prompt Keeper restores saved configurations when switching chats.
-                </p>
-                <div class="pk-radio-group">
-                    <label class="radio_label">
-                        <input type="radio" name="pk-restore-mode" value="auto" />
-                        <span data-i18n="Auto Restore">Auto Restore</span>
-                        <small class="pk-radio-hint">Automatically restore saved prompt states on chat switch.</small>
-                    </label>
-                    <label class="radio_label">
-                        <input type="radio" name="pk-restore-mode" value="ask" />
-                        <span data-i18n="Ask Before Restore">Ask Before Restore</span>
-                        <small class="pk-radio-hint">Show a confirmation dialog before restoring.</small>
-                    </label>
-                    <label class="radio_label">
-                        <input type="radio" name="pk-restore-mode" value="notify" />
-                        <span data-i18n="Notify Only">Notify Only</span>
-                        <small class="pk-radio-hint">Show a notification that a saved config exists, but don't restore automatically.</small>
-                    </label>
-                </div>
-                <hr class="sysHR" />
-                <div class="pk-info">
-                    <small>
-                        <i class="fa-solid fa-circle-info"></i>
-                        Prompt Keeper v1.0.0 — Saves prompt entry states per chat session.
-                    </small>
-                </div>
-            </div>
+
+        <hr class="sysHR" />
+
+        <div class="settings_section">
+            <label><strong>存储位置：</strong> 聊天元数据 (chatMetadata)</label>
+            <small>每个聊天独立保存，跟随聊天记录。</small>
+        </div>
+
+        <hr class="sysHR" />
+
+        <div class="settings_section">
+            <label><strong>自动保存时机：</strong> 发送消息之前</label>
+            <label><strong>自动恢复时机：</strong> 切换到已保存配置的聊天时</label>
+        </div>
+
+        <hr class="sysHR" />
+
+        <div class="settings_section">
+            <small>
+                💡 提示：如果恢复时有条目在当前预设中不存在，会跳过并显示提醒。
+                你也可以使用界面上的"恢复"和"删除"按钮手动操作。
+            </small>
         </div>
     </div>
 </div>
