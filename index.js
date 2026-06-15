@@ -78,7 +78,7 @@ function getPromptStates() {
             promptOrder = _resolvePromptOrder(window.power_user.prompt_order, context);
         }
 
-        if (!promptOrder || !Array.isArray(promptOrder) || promptOrder.length === 0) {
+        if (!promptOrder || !Array.isArray(promptOrder)) {
             return null;
         }
 
@@ -97,7 +97,7 @@ function getPromptStates() {
             states.push({ identifier, enabled });
         }
 
-        return states.length > 0 ? states : null;
+        return states; // 允许返回空数组，不因为没有条目而判定失败
     } catch (e) {
         console.error(`${LOG_PREFIX} Error reading prompt states:`, e);
         return null;
@@ -285,7 +285,7 @@ function saveConfig(showToast = false) {
 
     const states = getPromptStates();
     if (!states) {
-        console.warn(`${LOG_PREFIX} Cannot read prompt entry states`);
+        // 静默失败：仅在用户手动触发时显示提示，自动保存时不打印警告
         if (showToast) {
             toastr.warning('无法读取 Prompt Entry 状态', 'Prompt Keeper');
         }
