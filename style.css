@@ -100,13 +100,6 @@
     max-width: 200px;
 }
 
-.pk-description {
-    color: var(--SmartThemeBodyColor, #999);
-    line-height: 1.5;
-    display: block;
-    margin-top: 5px;
-}
-
 /* ============================================================
    Toast 通知中的恢复按钮
    ============================================================ */
@@ -116,4 +109,3 @@
     padding: 2px 10px;
     font-size: 0.85em;
 }
-
