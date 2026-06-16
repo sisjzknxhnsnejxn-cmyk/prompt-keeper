@@ -9,6 +9,9 @@
     border: 1px solid var(--SmartThemeBorderColor, #555);
     border-radius: 6px;
     background-color: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
+    position: relative;
+    z-index: 5;
+    pointer-events: auto;
 }
 
 .prompt-keeper-header {
@@ -37,10 +40,14 @@
     gap: 4px;
     padding: 4px 8px;
     font-size: 0.85em;
+    min-height: 32px;
+    position: relative;
+    z-index: 1;
     /* iOS Safari fix: ensure buttons are visually and functionally clickable */
     cursor: pointer;
     pointer-events: auto;
     -webkit-appearance: none;
+    appearance: none;
     -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
     touch-action: manipulation;
     user-select: none;
@@ -48,6 +55,11 @@
     /* Explicit color fallback to prevent grey/disabled appearance on iOS */
     color: var(--SmartThemeBodyColor, #ccc);
     opacity: 1;
+}
+
+.prompt-keeper-btn-group .menu_button i,
+.prompt-keeper-btn-group .menu_button span {
+    pointer-events: none;
 }
 
 .prompt-keeper-btn-group .menu_button:active,

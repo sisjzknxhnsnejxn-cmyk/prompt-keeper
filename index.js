@@ -71,6 +71,9 @@ const OBSERVER_REINJECTION_WINDOW = 30000;
 let eventsDelegated = false;
 let lastButtonActionTime = 0;
 const BUTTON_DEBOUNCE_MS = 400;
+const BUTTON_EVENT_TYPES = window.PointerEvent
+    ? ['pointerup', 'click']
+    : ['touchend', 'click'];
 
 // ========== Settings ==========
 
@@ -1249,7 +1252,7 @@ function showSlotPicker(mode) {
         `);
         $item.find('.pk-slot-name').text(name);
         $item.find('.pk-slot-time').text(formatSlotTime(slot.savedAt));
-        $item.on('click.pk', async function (e) {
+        const onSlotPress = async function (e) {
             e.preventDefault();
             e.stopPropagation();
             if (isDelete) {
@@ -1260,17 +1263,33 @@ function showSlotPicker(mode) {
                 await restoreStatesFromMetadata(false, name);
             }
             closeSlotPicker();
-        });
+        };
+        for (const eventType of BUTTON_EVENT_TYPES) {
+            $item[0].addEventListener(eventType, onSlotPress, { passive: false });
+        }
         $list.append($item);
     }
 
-    $modal.find('.pk-modal-theme').on('click.pk', function (e) {
+    const themeButton = $modal.find('.pk-modal-theme')[0];
+    const cancelButton = $modal.find('.pk-modal-cancel')[0];
+
+    const onThemePress = function (e) {
         e.preventDefault();
         e.stopPropagation();
         toggleSlotPickerTheme();
-    });
-    $modal.find('.pk-modal-cancel').on('click.pk', closeSlotPicker);
-    $modal.on('click.pk', function (e) {
+    };
+    const onCancelPress = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSlotPicker();
+    };
+
+    for (const eventType of BUTTON_EVENT_TYPES) {
+        themeButton.addEventListener(eventType, onThemePress, { passive: false });
+        cancelButton.addEventListener(eventType, onCancelPress, { passive: false });
+    }
+
+    $modal.on('click.pk pointerup.pk touchend.pk', function (e) {
         if (e.target === this) closeSlotPicker();
     });
 
@@ -1288,6 +1307,26 @@ function handlePromptKeeperButtonAction(selector, $btn) {
     const action = actions[selector];
     if (!action) return;
     executeButtonAction(action, $btn);
+}
+
+function getPromptKeeperButtonFromEvent(e) {
+    const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+    for (const target of path) {
+        if (target && target.id && ['prompt-keeper-save', 'prompt-keeper-restore', 'prompt-keeper-delete'].includes(target.id)) {
+            return target;
+        }
+    }
+    return e.target && e.target.closest
+        ? e.target.closest('#prompt-keeper-save, #prompt-keeper-restore, #prompt-keeper-delete')
+        : null;
+}
+
+function onPromptKeeperButtonPress(e) {
+    const button = getPromptKeeperButtonFromEvent(e);
+    if (!button) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handlePromptKeeperButtonAction(`#${button.id}`, jQuery(button));
 }
 
 function pauseUIObserver() {
@@ -1436,31 +1475,42 @@ function bindButtonEvents() {
     for (const selector of selectors) {
         const $btn = jQuery(selector);
         if ($btn.length === 0) continue;
+        const button = $btn[0];
 
         // 移除可能的旧绑定，防止重复
-        $btn.off('click.pk touchend.pk');
+        $btn.off('click.pk touchend.pk pointerup.pk');
+        for (const eventType of BUTTON_EVENT_TYPES) {
+            button.removeEventListener(eventType, onPromptKeeperButtonPress, true);
+            button.addEventListener(eventType, onPromptKeeperButtonPress, { capture: true, passive: false });
+        }
 
         $btn.on('click.pk', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
             handlePromptKeeperButtonAction(selector, jQuery(this));
         });
 
         $btn.on('touchend.pk', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
+            handlePromptKeeperButtonAction(selector, jQuery(this));
+        });
+
+        $btn.on('pointerup.pk', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
             handlePromptKeeperButtonAction(selector, jQuery(this));
         });
     }
 
     if (!eventsDelegated) {
         eventsDelegated = true;
-        jQuery(document).on('click.pk touchend.pk', '#prompt-keeper-save, #prompt-keeper-restore, #prompt-keeper-delete', function (e) {
+        for (const eventType of BUTTON_EVENT_TYPES) {
+            document.addEventListener(eventType, onPromptKeeperButtonPress, { capture: true, passive: false });
+        }
+        jQuery(document).on('click.pk touchend.pk pointerup.pk', '#prompt-keeper-save, #prompt-keeper-restore, #prompt-keeper-delete', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
             handlePromptKeeperButtonAction(`#${this.id}`, jQuery(this));
         });
     }
@@ -1479,15 +1529,15 @@ function injectUI() {
             <span id="prompt-keeper-status" class="pk-not-saved">⚠ 无保存</span>
         </div>
         <div id="prompt-keeper-btn-group" class="prompt-keeper-btn-group">
-            <button id="prompt-keeper-save" class="menu_button" title="保存当前预设条目配置">
+            <button type="button" id="prompt-keeper-save" class="menu_button" title="保存当前预设条目配置">
                 <i class="fa-solid fa-floppy-disk"></i>
                 <span>保存</span>
             </button>
-            <button id="prompt-keeper-restore" class="menu_button" title="恢复保存的预设条目配置">
+            <button type="button" id="prompt-keeper-restore" class="menu_button" title="恢复保存的预设条目配置">
                 <i class="fa-solid fa-rotate-left"></i>
                 <span>恢复</span>
             </button>
-            <button id="prompt-keeper-delete" class="menu_button" title="删除当前聊天的保存配置">
+            <button type="button" id="prompt-keeper-delete" class="menu_button" title="删除当前聊天的保存配置">
                 <i class="fa-solid fa-trash-can"></i>
                 <span>删除</span>
             </button>
