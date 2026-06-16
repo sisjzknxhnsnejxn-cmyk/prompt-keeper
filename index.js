@@ -184,6 +184,22 @@ function normalizeSlotName(name) {
     return String(name || '').trim() || '未命名预设';
 }
 
+function normalizePresetKey(name) {
+    return normalizeSlotName(name).toLowerCase();
+}
+
+function findSlotName(state, presetName) {
+    if (!state || !state.slots || !presetName) return null;
+
+    const normalizedPreset = normalizePresetKey(presetName);
+    for (const [slotName, slot] of Object.entries(state.slots)) {
+        if (normalizePresetKey(slotName) === normalizedPreset) return slotName;
+        if (slot && normalizePresetKey(slot.presetName) === normalizedPreset) return slotName;
+    }
+
+    return null;
+}
+
 function getSlotEntries(state) {
     if (!state || !state.slots || typeof state.slots !== 'object') return [];
     return Object.entries(state.slots)
@@ -196,6 +212,13 @@ function getDefaultSlotState(state) {
     if (state.defaultSlot && state.slots[state.defaultSlot]) return state.slots[state.defaultSlot];
     const first = getSlotEntries(state)[0];
     return first ? first[1] : null;
+}
+
+function getDefaultSlotName(state) {
+    if (!state || !state.slots) return null;
+    if (state.defaultSlot && state.slots[state.defaultSlot]) return state.defaultSlot;
+    const first = getSlotEntries(state)[0];
+    return first ? first[0] : null;
 }
 
 function persistMigratedStateIfNeeded(chatMetadata, rawState, migratedState) {
@@ -338,7 +361,8 @@ function promptOrderEqual(a, b) {
 /**
  * 脏检查：对比当前状态与保存状态，决定是否需要恢复。
  */
-function checkDirtyState(savedState) {
+function checkDirtyState(savedState, options = {}) {
+    const allowPresetSwitch = options.allowPresetSwitch !== false;
     const result = {
         needsPresetSwitch: false,
         needsEntryRestore: false,
@@ -347,7 +371,7 @@ function checkDirtyState(savedState) {
 
     if (!savedState || !savedState.prompts) return result;
 
-    if (savedState.presetName) {
+    if (allowPresetSwitch && savedState.presetName) {
         const currentPreset = getCurrentPresetName();
         if (currentPreset && currentPreset.trim() !== savedState.presetName.trim()) {
             result.needsPresetSwitch = true;
@@ -856,7 +880,7 @@ function saveStatesToMetadata() {
     return true;
 }
 
-async function restoreStatesFromMetadata(silent = false, slotName = null) {
+async function restoreStatesFromMetadata(silent = false, slotName = null, options = {}) {
     if (!isPluginEnabled()) return false;
 
     const ctx = getCtx();
@@ -884,8 +908,29 @@ async function restoreStatesFromMetadata(silent = false, slotName = null) {
         return false;
     }
 
-    const targetSlotName = slotName || savedState.defaultSlot;
-    const targetSlot = targetSlotName && savedState.slots ? savedState.slots[targetSlotName] : getDefaultSlotState(savedState);
+    const manualRestore = slotName !== null;
+    const allowPresetSwitch = options.allowPresetSwitch !== undefined ? options.allowPresetSwitch : manualRestore;
+    const currentPresetName = normalizeSlotName(getCurrentPresetName());
+    let targetSlotName = slotName;
+
+    if (targetSlotName && !savedState.slots[targetSlotName]) {
+        targetSlotName = findSlotName(savedState, targetSlotName);
+    }
+
+    if (!targetSlotName) {
+        targetSlotName = findSlotName(savedState, currentPresetName);
+    }
+
+    if (!targetSlotName && silent) {
+        console.debug(LOG_PREFIX, `Auto-restore skipped: no saved slot matches current preset "${currentPresetName}".`);
+        return false;
+    }
+
+    if (!targetSlotName) {
+        targetSlotName = getDefaultSlotName(savedState);
+    }
+
+    const targetSlot = targetSlotName && savedState.slots ? savedState.slots[targetSlotName] : null;
     if (!targetSlot || !targetSlot.prompts) {
         if (!silent) toastr.warning('选择的预设槽位不可用，可能已被删除。', 'Prompt Keeper');
         return false;
@@ -903,7 +948,7 @@ async function restoreStatesFromMetadata(silent = false, slotName = null) {
         }
     }
 
-    const dirty = checkDirtyState(targetSlot);
+    const dirty = checkDirtyState(targetSlot, { allowPresetSwitch });
     if (!dirty.needsPresetSwitch && !dirty.needsEntryRestore) {
         console.debug(LOG_PREFIX, 'Dirty check passed: current state matches saved state, skipping restore.');
         if (!silent) toastr.info('当前状态已与保存配置一致，无需恢复。', 'Prompt Keeper');
@@ -1022,7 +1067,9 @@ function getSavedAt() {
     const ctx = getCtx();
     const chatMetadata = ctx.chatMetadata;
     const savedState = migrateState(chatMetadata && chatMetadata[METADATA_KEY]);
-    const defaultSlot = getDefaultSlotState(savedState);
+    const currentSlotName = findSlotName(savedState, getCurrentPresetName());
+    const currentSlot = currentSlotName && savedState && savedState.slots ? savedState.slots[currentSlotName] : null;
+    const defaultSlot = currentSlot || getDefaultSlotState(savedState);
     return defaultSlot ? (defaultSlot.savedAt || null) : null;
 }
 
@@ -1228,6 +1275,19 @@ function showSlotPicker(mode) {
     });
 
     jQuery(document.body).append($modal);
+    console.debug(LOG_PREFIX, `Slot picker opened in ${mode} mode with ${slotEntries.length} slot(s).`);
+}
+
+function handlePromptKeeperButtonAction(selector, $btn) {
+    const actions = {
+        '#prompt-keeper-save': () => saveStatesToMetadata(),
+        '#prompt-keeper-restore': () => showSlotPicker('restore'),
+        '#prompt-keeper-delete': () => deleteStateFromMetadata(),
+    };
+
+    const action = actions[selector];
+    if (!action) return;
+    executeButtonAction(action, $btn);
 }
 
 function pauseUIObserver() {
@@ -1371,13 +1431,9 @@ function executeButtonAction(action, $btn) {
  * 防重复触发通过 BUTTON_DEBOUNCE_MS 时间窗口控制。
  */
 function bindButtonEvents() {
-    const actions = {
-        '#prompt-keeper-save': () => saveStatesToMetadata(),
-        '#prompt-keeper-restore': () => showSlotPicker('restore'),
-        '#prompt-keeper-delete': () => deleteStateFromMetadata(),
-    };
+    const selectors = ['#prompt-keeper-save', '#prompt-keeper-restore', '#prompt-keeper-delete'];
 
-    for (const [selector, action] of Object.entries(actions)) {
+    for (const selector of selectors) {
         const $btn = jQuery(selector);
         if ($btn.length === 0) continue;
 
@@ -1385,14 +1441,27 @@ function bindButtonEvents() {
         $btn.off('click.pk touchend.pk');
 
         $btn.on('click.pk', function (e) {
+            e.preventDefault();
             e.stopPropagation();
-            executeButtonAction(action, jQuery(this));
+            e.stopImmediatePropagation();
+            handlePromptKeeperButtonAction(selector, jQuery(this));
         });
 
         $btn.on('touchend.pk', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            executeButtonAction(action, jQuery(this));
+            e.stopImmediatePropagation();
+            handlePromptKeeperButtonAction(selector, jQuery(this));
+        });
+    }
+
+    if (!eventsDelegated) {
+        eventsDelegated = true;
+        jQuery(document).on('click.pk touchend.pk', '#prompt-keeper-save, #prompt-keeper-restore, #prompt-keeper-delete', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            handlePromptKeeperButtonAction(`#${this.id}`, jQuery(this));
         });
     }
 
