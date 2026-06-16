@@ -6,8 +6,8 @@
     "js": "index.js",
     "css": "style.css",
     "author": "sisjzknxhnsnejxn-cmyk",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "homePage": "https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper",
     "auto_update": true,
-    "update_url": "https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper.git"
+    "update_url": "https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper"
 }
