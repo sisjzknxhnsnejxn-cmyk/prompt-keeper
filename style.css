@@ -71,6 +71,154 @@
     margin-left: auto;
 }
 
+/* Slot picker modal */
+#prompt-keeper-modal.pk-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.55);
+    touch-action: manipulation;
+}
+
+#prompt-keeper-modal .pk-modal-card {
+    width: min(300px, calc(100vw - 32px));
+    max-height: min(70vh, 560px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--SmartThemeBorderColor, #666);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+#prompt-keeper-modal.pk-modal-dark .pk-modal-card {
+    background: #111;
+    color: #f3f3f3;
+}
+
+#prompt-keeper-modal.pk-modal-light .pk-modal-card {
+    background: #f7f7f7;
+    color: #111;
+}
+
+.pk-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pk-modal-theme,
+.pk-modal-cancel,
+.pk-slot-item {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.pk-modal-theme {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--SmartThemeQuoteColor, #555);
+    color: #fff;
+    font-size: 0.85em;
+}
+
+.pk-modal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: auto;
+    padding-right: 2px;
+}
+
+.pk-slot-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(127, 127, 127, 0.12);
+    color: inherit;
+    text-align: left;
+}
+
+.pk-slot-item:active,
+.pk-slot-item.pk-btn-active {
+    transform: scale(0.98);
+    opacity: 0.85;
+}
+
+.pk-slot-delete {
+    border: 1px solid rgba(220, 60, 60, 0.45);
+    background: rgba(220, 60, 60, 0.08);
+}
+
+.pk-slot-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pk-slot-name {
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.pk-slot-default {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--SmartThemeQuoteColor, #555);
+    color: #fff;
+    font-size: 0.7em;
+}
+
+.pk-slot-time {
+    color: var(--SmartThemeBodyColor, #aaa);
+    font-size: 0.82em;
+}
+
+.pk-modal-cancel {
+    margin-top: auto;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(127, 127, 127, 0.18);
+    color: inherit;
+    font-weight: 600;
+}
+
+.pk-modal-cancel:active,
+.pk-modal-theme:active {
+    opacity: 0.85;
+}
+
+@media (max-width: 480px) {
+    #prompt-keeper-modal.pk-modal-overlay {
+        align-items: flex-end;
+        padding: 10px;
+    }
+
+    #prompt-keeper-modal .pk-modal-card {
+        width: 100%;
+        max-height: 75vh;
+        border-radius: 14px 14px 10px 10px;
+    }
+}
+
 /* Settings panel */
 #prompt-keeper-settings .settings_section {
     padding: 4px 0;
