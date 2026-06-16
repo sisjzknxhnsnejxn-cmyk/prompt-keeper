@@ -19,7 +19,15 @@ const DEFAULT_SETTINGS = {
     enabled: true,
     autoRestore: true,
     autoRestoreDelay: 1500,
+    slotPickerTheme: 'dark',
 };
+
+const AUTO_RESTORE_CONTEXT_TIMEOUT_MS = 2500;
+const AUTO_RESTORE_CONTEXT_POLL_MS = 100;
+const PRESET_SWITCH_TIMEOUT_MS = 1200;
+const PRESET_SWITCH_POLL_MS = 50;
+const PROMPT_STATE_READY_TIMEOUT_MS = 1200;
+const PROMPT_STATE_READY_POLL_MS = 50;
 
 const SETTINGS_HTML = `
 <div id="prompt-keeper-settings" class="inline-drawer">
@@ -74,6 +82,7 @@ const BUTTON_DEBOUNCE_MS = 400;
 const BUTTON_EVENT_TYPES = window.PointerEvent
     ? ['pointerup', 'click']
     : ['touchend', 'click'];
+const INTERACTION_DEBOUNCE_MS = 450;
 
 // ========== Settings ==========
 
@@ -92,6 +101,7 @@ function loadPluginSettings() {
     const settings = ctx.extensionSettings[SETTINGS_KEY];
     if (settings.autoRestore === undefined) settings.autoRestore = DEFAULT_SETTINGS.autoRestore;
     if (settings.autoRestoreDelay === undefined) settings.autoRestoreDelay = DEFAULT_SETTINGS.autoRestoreDelay;
+    if (!['dark', 'light'].includes(settings.slotPickerTheme)) settings.slotPickerTheme = DEFAULT_SETTINGS.slotPickerTheme;
     return settings;
 }
 
@@ -222,6 +232,49 @@ function getDefaultSlotName(state) {
     if (state.defaultSlot && state.slots[state.defaultSlot]) return state.defaultSlot;
     const first = getSlotEntries(state)[0];
     return first ? first[0] : null;
+}
+
+function getBestRestoreSlotName(state, requestedSlotName = null) {
+    if (!state || !state.slots) return null;
+
+    let targetSlotName = requestedSlotName;
+    if (targetSlotName && !state.slots[targetSlotName]) {
+        targetSlotName = findSlotName(state, targetSlotName);
+    }
+    if (targetSlotName) return targetSlotName;
+
+    const currentPresetName = getCurrentPresetName();
+    targetSlotName = findSlotName(state, currentPresetName);
+    if (targetSlotName) return targetSlotName;
+
+    return getDefaultSlotName(state);
+}
+
+function getSavedStateFromCurrentChat() {
+    const ctx = getCtx();
+    const chatMetadata = ctx.chatMetadata;
+    const rawState = chatMetadata && chatMetadata[METADATA_KEY];
+    const savedState = migrateState(rawState);
+    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState);
+    return { chatMetadata, rawState, savedState };
+}
+
+async function waitForChatContext(chatId, timeoutMs = AUTO_RESTORE_CONTEXT_TIMEOUT_MS) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+        const ctx = getCtx();
+        if (ctx.chatId === chatId && ctx.chatMetadata) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const stableCtx = getCtx();
+            if (stableCtx.chatId === chatId && stableCtx.chatMetadata === ctx.chatMetadata) {
+                return true;
+            }
+        }
+        await new Promise(resolve => setTimeout(resolve, AUTO_RESTORE_CONTEXT_POLL_MS));
+    }
+
+    return false;
 }
 
 function persistMigratedStateIfNeeded(chatMetadata, rawState, migratedState) {
@@ -702,6 +755,41 @@ function getCurrentPresetName() {
     return null;
 }
 
+function isPresetNameMatch(currentPreset, targetPreset) {
+    return Boolean(currentPreset && targetPreset && currentPreset.trim().toLowerCase() === targetPreset.trim().toLowerCase());
+}
+
+async function waitForPresetSwitch(presetName, timeoutMs = PRESET_SWITCH_TIMEOUT_MS) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+        if (isPresetNameMatch(getCurrentPresetName(), presetName)) return true;
+        await new Promise(resolve => setTimeout(resolve, PRESET_SWITCH_POLL_MS));
+    }
+    return isPresetNameMatch(getCurrentPresetName(), presetName);
+}
+
+async function waitForPromptStateReady(savedState, chatIdAtStart, timeoutMs = PROMPT_STATE_READY_TIMEOUT_MS) {
+    const savedPrompts = savedState && savedState.prompts ? savedState.prompts : {};
+    const savedIdentifiers = new Set(Object.keys(savedPrompts));
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+        if (chatIdAtStart && getCtx().chatId !== chatIdAtStart) return false;
+
+        const currentStates = readPromptStates();
+        if (currentStates && currentStates.prompts) {
+            const currentIdentifiers = Object.keys(currentStates.prompts);
+            if (currentIdentifiers.some(identifier => savedIdentifiers.has(identifier))) {
+                return true;
+            }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, PROMPT_STATE_READY_POLL_MS));
+    }
+
+    return true;
+}
+
 /**
  * 切换到指定预设。依次尝试 PresetManager API → DOM selector → Slash command。
  */
@@ -728,14 +816,10 @@ async function switchToPreset(presetName) {
             for (const method of methodCandidates) {
                 try {
                     await method.call(pm, presetName);
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                    await waitForPresetSwitch(presetName);
                     const current = getCurrentPresetName();
-                    if (current === presetName) {
+                    if (isPresetNameMatch(current, presetName)) {
                         console.log(LOG_PREFIX, `Switched preset to "${presetName}" via PresetManager native method.`);
-                        return true;
-                    }
-                    if (current && current.trim().toLowerCase() === presetName.trim().toLowerCase()) {
-                        console.log(LOG_PREFIX, `Switched preset to "${presetName}" via PresetManager (case-insensitive match).`);
                         return true;
                     }
                     console.debug(LOG_PREFIX, `PresetManager method ${method.name || '(anonymous)'} called but preset name mismatch (got "${current}"), trying next.`);
@@ -776,6 +860,7 @@ async function switchToPreset(presetName) {
             }
 
             if (matched) {
+                await waitForPresetSwitch(presetName);
                 console.log(LOG_PREFIX, `Switched preset to "${presetName}" via DOM selector.`);
                 return true;
             } else {
@@ -792,13 +877,11 @@ async function switchToPreset(presetName) {
         const escapedName = presetName.replace(/"/g, '\\"');
         if (ctx.executeSlashCommandsWithOptions) {
             await ctx.executeSlashCommandsWithOptions(`/preset "${escapedName}"`);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            if (getCurrentPresetName() === presetName) return true;
+            if (await waitForPresetSwitch(presetName)) return true;
         }
         if (ctx.executeSlashCommands) {
             await ctx.executeSlashCommands(`/preset "${escapedName}"`);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            if (getCurrentPresetName() === presetName) return true;
+            if (await waitForPresetSwitch(presetName)) return true;
         }
     } catch (e) {
         console.warn(LOG_PREFIX, `Slash command approach failed for preset "${presetName}":`, e);
@@ -889,21 +972,30 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
     const ctx = getCtx();
     const chatId = ctx.chatId;
     const chatIdAtStart = chatId;
+    const isAutoRestore = options.autoRestore === true;
 
     if (!chatId) {
         if (!silent) toastr.warning('没有活跃的聊天，无法恢复。', 'Prompt Keeper');
         return false;
     }
 
-    const chatMetadata = ctx.chatMetadata;
+    let chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
         if (!silent) toastr.warning('chatMetadata 不可用，无法恢复。', 'Prompt Keeper');
         return false;
     }
 
-    const rawState = chatMetadata[METADATA_KEY];
-    const savedState = migrateState(rawState);
-    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState);
+    if (isAutoRestore) {
+        const contextReady = await waitForChatContext(chatIdAtStart);
+        if (!contextReady || getCtx().chatId !== chatIdAtStart) {
+            console.warn(LOG_PREFIX, `Auto-restore aborted: chat context did not stabilize for chat ${chatIdAtStart}.`);
+            return false;
+        }
+    }
+
+    const savedContext = getSavedStateFromCurrentChat();
+    chatMetadata = savedContext.chatMetadata;
+    const savedState = savedContext.savedState;
 
     const slotEntries = getSlotEntries(savedState);
     if (!savedState || slotEntries.length === 0) {
@@ -911,32 +1003,21 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
         return false;
     }
 
-    const manualRestore = slotName !== null;
-    const allowPresetSwitch = options.allowPresetSwitch !== undefined ? options.allowPresetSwitch : manualRestore;
-    const currentPresetName = normalizeSlotName(getCurrentPresetName());
-    let targetSlotName = slotName;
-
-    if (targetSlotName && !savedState.slots[targetSlotName]) {
-        targetSlotName = findSlotName(savedState, targetSlotName);
-    }
-
-    if (!targetSlotName) {
-        targetSlotName = findSlotName(savedState, currentPresetName);
-    }
-
-    if (!targetSlotName && silent) {
-        console.debug(LOG_PREFIX, `Auto-restore skipped: no saved slot matches current preset "${currentPresetName}".`);
-        return false;
-    }
-
-    if (!targetSlotName) {
-        targetSlotName = getDefaultSlotName(savedState);
-    }
+    const allowPresetSwitch = options.allowPresetSwitch !== undefined ? options.allowPresetSwitch : true;
+    const targetSlotName = getBestRestoreSlotName(savedState, slotName);
 
     const targetSlot = targetSlotName && savedState.slots ? savedState.slots[targetSlotName] : null;
     if (!targetSlot || !targetSlot.prompts) {
         if (!silent) toastr.warning('选择的预设槽位不可用，可能已被删除。', 'Prompt Keeper');
         return false;
+    }
+
+    if (isAutoRestore) {
+        toastr.info(
+            `正在恢复当前聊天的默认预设槽位「${targetSlotName || targetSlot.presetName || '默认'}」…`,
+            'Prompt Keeper',
+            { timeOut: 1800 }
+        );
     }
 
     const isFutureVersion = savedState.__futureVersion === true;
@@ -955,6 +1036,9 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
     if (!dirty.needsPresetSwitch && !dirty.needsEntryRestore) {
         console.debug(LOG_PREFIX, 'Dirty check passed: current state matches saved state, skipping restore.');
         if (!silent) toastr.info('当前状态已与保存配置一致，无需恢复。', 'Prompt Keeper');
+        if (isAutoRestore) {
+            toastr.info(`当前聊天已是默认槽位「${targetSlotName || targetSlot.presetName || '默认'}」。`, 'Prompt Keeper', { timeOut: 1800 });
+        }
         return true;
     }
 
@@ -969,16 +1053,16 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
         }
 
         if (presetSwitched) {
-            await new Promise(resolve => setTimeout(resolve, 600));
+            const promptStateReady = await waitForPromptStateReady(targetSlot, chatIdAtStart);
 
-            if (getCtx().chatId !== chatIdAtStart) {
-                console.warn(LOG_PREFIX, `Restore aborted: chatId changed after preset switch delay.`);
+            if (!promptStateReady || getCtx().chatId !== chatIdAtStart) {
+                console.warn(LOG_PREFIX, `Restore aborted: chatId changed or prompt state not ready after preset switch.`);
                 return false;
             }
         } else {
             const msg = `无法切换到保存的预设 "${dirty.targetPreset}"，该预设可能已改名或在此设备上不存在。`;
             console.warn(LOG_PREFIX, msg);
-            if (!silent) toastr.warning(msg + '请手动切换预设后再尝试恢复。', 'Prompt Keeper', { timeOut: 6000 });
+            if (!silent || isAutoRestore) toastr.warning(msg + '请手动切换预设后再尝试恢复。', 'Prompt Keeper', { timeOut: 6000 });
             return false;
         }
     }
@@ -1007,7 +1091,7 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
     if (!silent) {
         toastr.success(`预设槽位「${targetSlotName || targetSlot.presetName || '默认'}」已恢复。${presetInfo}`, 'Prompt Keeper');
     } else {
-        toastr.info(`已自动恢复默认槽位。${presetInfo}`, 'Prompt Keeper', { timeOut: 2000 });
+        toastr.success(`已自动恢复默认槽位「${targetSlotName || targetSlot.presetName || '默认'}」。${presetInfo}`, 'Prompt Keeper', { timeOut: 2500 });
     }
 
     console.log(LOG_PREFIX, `Restored prompt states for chat: ${chatId}, preset switched: ${presetSwitched}`);
@@ -1121,6 +1205,12 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
             return;
         }
 
+        const contextReady = await waitForChatContext(newChatId);
+        if (!contextReady || getCtx().chatId !== newChatId) {
+            console.warn(LOG_PREFIX, `Auto-restore cancelled: chat context not ready for ${newChatId}.`);
+            return;
+        }
+
         const hasSave = hasSavedState();
         requestAnimationFrame(() => updateStatusDisplay(hasSave, getSavedAt()));
 
@@ -1130,7 +1220,7 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
                 return;
             }
             console.log(LOG_PREFIX, `Auto-restore triggered for chat: ${newChatId}`);
-            await restoreStatesFromMetadata(true);
+            await restoreStatesFromMetadata(true, null, { autoRestore: true });
         }
     }, totalDelay);
 
@@ -1202,10 +1292,25 @@ function closeSlotPicker() {
     jQuery('#prompt-keeper-modal').remove();
 }
 
+function shouldHandleInteraction(element) {
+    if (!element) return false;
+    const now = Date.now();
+    const lastHandled = Number(element.dataset.pkLastHandled || 0);
+    if (now - lastHandled < INTERACTION_DEBOUNCE_MS) return false;
+    element.dataset.pkLastHandled = String(now);
+    return true;
+}
+
 function toggleSlotPickerTheme() {
     const $modal = jQuery('#prompt-keeper-modal');
+    if ($modal.length === 0) return;
     const isLight = $modal.hasClass('pk-modal-light');
-    $modal.toggleClass('pk-modal-light', !isLight).toggleClass('pk-modal-dark', isLight);
+    const nextTheme = isLight ? 'dark' : 'light';
+    $modal.toggleClass('pk-modal-light', nextTheme === 'light').toggleClass('pk-modal-dark', nextTheme === 'dark');
+
+    const settings = loadPluginSettings();
+    settings.slotPickerTheme = nextTheme;
+    savePluginSettings();
 }
 
 function showSlotPicker(mode) {
@@ -1225,8 +1330,10 @@ function showSlotPicker(mode) {
 
     const isDelete = mode === 'delete';
     const title = isDelete ? '删除预设槽位' : '恢复预设槽位';
+    const settings = loadPluginSettings();
+    const theme = settings.slotPickerTheme === 'light' ? 'light' : 'dark';
     const $modal = jQuery(`
-        <div id="prompt-keeper-modal" class="pk-modal-overlay pk-modal-dark">
+        <div id="prompt-keeper-modal" class="pk-modal-overlay pk-modal-${theme}">
             <div class="pk-modal-card" role="dialog" aria-modal="true" aria-label="${title}">
                 <div class="pk-modal-header">
                     <strong>${title}</strong>
@@ -1255,11 +1362,21 @@ function showSlotPicker(mode) {
         const onSlotPress = async function (e) {
             e.preventDefault();
             e.stopPropagation();
+            if (!shouldHandleInteraction($item[0]) || $item.prop('disabled')) return;
+
+            $item.addClass('pk-slot-selected pk-slot-working').prop('disabled', true);
+            $list.find('.pk-slot-item').not($item).prop('disabled', true).addClass('pk-slot-disabled');
+
             if (isDelete) {
                 const confirmed = window.confirm(`确认删除预设槽位「${name}」吗？`);
-                if (!confirmed) return;
+                if (!confirmed) {
+                    $item.removeClass('pk-slot-selected pk-slot-working').prop('disabled', false);
+                    $list.find('.pk-slot-item').not($item).prop('disabled', false).removeClass('pk-slot-disabled');
+                    return;
+                }
                 deleteSlotFromMetadata(name);
             } else {
+                $item.find('.pk-slot-time').text('正在恢复，请稍候…');
                 await restoreStatesFromMetadata(false, name);
             }
             closeSlotPicker();
@@ -1276,11 +1393,13 @@ function showSlotPicker(mode) {
     const onThemePress = function (e) {
         e.preventDefault();
         e.stopPropagation();
+        if (!shouldHandleInteraction(themeButton)) return;
         toggleSlotPickerTheme();
     };
     const onCancelPress = function (e) {
         e.preventDefault();
         e.stopPropagation();
+        if (!shouldHandleInteraction(cancelButton)) return;
         closeSlotPicker();
     };
 
