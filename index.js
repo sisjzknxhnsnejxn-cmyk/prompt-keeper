@@ -67,6 +67,8 @@ const OBSERVER_REINJECTION_LIMIT = 10;
 const OBSERVER_REINJECTION_WINDOW = 30000;
 
 let eventsDelegated = false;
+let lastButtonActionTime = 0;
+const BUTTON_DEBOUNCE_MS = 400;
 
 // ========== Settings ==========
 
@@ -1123,20 +1125,60 @@ function startUIObserver() {
     console.debug(LOG_PREFIX, `UI Observer attached to ${observeTarget.id || observeTarget.tagName} with subtree:${useSubtree}`);
 }
 
-function injectUI() {
-    if (!eventsDelegated) {
-        const bindAction = (selector, action) => {
-            jQuery(document).on('click', selector, (e) => {
-                e.preventDefault();
-                action();
-            });
-        };
-        bindAction('#prompt-keeper-save', () => saveStatesToMetadata());
-        bindAction('#prompt-keeper-restore', () => restoreStatesFromMetadata(false));
-        bindAction('#prompt-keeper-delete', () => deleteStateFromMetadata());
-        eventsDelegated = true;
+/**
+ * 按钮动作执行器：防重复触发（iOS 上 click+touchend 可能双触发）
+ */
+function executeButtonAction(action, $btn) {
+    const now = Date.now();
+    if (now - lastButtonActionTime < BUTTON_DEBOUNCE_MS) {
+        console.debug(LOG_PREFIX, 'Button action debounced (too fast).');
+        return;
+    }
+    lastButtonActionTime = now;
+
+    // 视觉反馈：按钮短暂高亮
+    if ($btn && $btn.length) {
+        $btn.addClass('pk-btn-active');
+        setTimeout(() => $btn.removeClass('pk-btn-active'), 200);
     }
 
+    action();
+}
+
+/**
+ * 直接绑定按钮事件（非事件委托）。
+ * 同时绑定 click 和 touchend，iOS Safari 上 touchend 更可靠。
+ * 防重复触发通过 BUTTON_DEBOUNCE_MS 时间窗口控制。
+ */
+function bindButtonEvents() {
+    const actions = {
+        '#prompt-keeper-save': () => saveStatesToMetadata(),
+        '#prompt-keeper-restore': () => restoreStatesFromMetadata(false),
+        '#prompt-keeper-delete': () => deleteStateFromMetadata(),
+    };
+
+    for (const [selector, action] of Object.entries(actions)) {
+        const $btn = jQuery(selector);
+        if ($btn.length === 0) continue;
+
+        // 移除可能的旧绑定，防止重复
+        $btn.off('click.pk touchend.pk');
+
+        $btn.on('click.pk', function (e) {
+            e.stopPropagation();
+            executeButtonAction(action, jQuery(this));
+        });
+
+        $btn.on('touchend.pk', function (e) {
+            e.stopPropagation();
+            executeButtonAction(action, jQuery(this));
+        });
+    }
+
+    console.debug(LOG_PREFIX, 'Button events directly bound.');
+}
+
+function injectUI() {
     if (jQuery('#prompt-keeper-bar').length > 0) return;
 
     const buttonBarHtml = `
@@ -1230,6 +1272,9 @@ function injectUI() {
         return;
     }
 
+
+    // 直接绑定按钮事件（非事件委托，iOS 兼容）
+    bindButtonEvents();
 
     requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
 

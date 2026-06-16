@@ -50,9 +50,12 @@
     opacity: 1;
 }
 
-.prompt-keeper-btn-group .menu_button:active {
+.prompt-keeper-btn-group .menu_button:active,
+.prompt-keeper-btn-group .menu_button.pk-btn-active {
     opacity: 0.7;
     transform: scale(0.97);
+    background-color: var(--SmartThemeQuoteColor, rgba(168, 200, 255, 0.2));
+    transition: opacity 0.1s, transform 0.1s, background-color 0.15s;
 }
 
 /* Status indicators */
