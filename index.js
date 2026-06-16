@@ -1124,6 +1124,19 @@ function startUIObserver() {
 }
 
 function injectUI() {
+    if (!eventsDelegated) {
+        const bindAction = (selector, action) => {
+            jQuery(document).on('click', selector, (e) => {
+                e.preventDefault();
+                action();
+            });
+        };
+        bindAction('#prompt-keeper-save', () => saveStatesToMetadata());
+        bindAction('#prompt-keeper-restore', () => restoreStatesFromMetadata(false));
+        bindAction('#prompt-keeper-delete', () => deleteStateFromMetadata());
+        eventsDelegated = true;
+    }
+
     if (jQuery('#prompt-keeper-bar').length > 0) return;
 
     const buttonBarHtml = `
@@ -1217,23 +1230,6 @@ function injectUI() {
         return;
     }
 
-    // 委托事件只绑定一次；同时绑定 click + touchend 解决 iOS Safari 冒泡问题
-    if (!eventsDelegated) {
-        const bindAction = (selector, action) => {
-            jQuery(document).on('click', selector, (e) => {
-                e.preventDefault();
-                action();
-            });
-            jQuery(document).on('touchend', selector, (e) => {
-                e.preventDefault();
-                action();
-            });
-        };
-        bindAction('#prompt-keeper-save', () => saveStatesToMetadata());
-        bindAction('#prompt-keeper-restore', () => restoreStatesFromMetadata(false));
-        bindAction('#prompt-keeper-delete', () => deleteStateFromMetadata());
-        eventsDelegated = true;
-    }
 
     requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
 
