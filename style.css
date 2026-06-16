@@ -37,6 +37,22 @@
     gap: 4px;
     padding: 4px 8px;
     font-size: 0.85em;
+    /* iOS Safari fix: ensure buttons are visually and functionally clickable */
+    cursor: pointer;
+    pointer-events: auto;
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    /* Explicit color fallback to prevent grey/disabled appearance on iOS */
+    color: var(--SmartThemeBodyColor, #ccc);
+    opacity: 1;
+}
+
+.prompt-keeper-btn-group .menu_button:active {
+    opacity: 0.7;
+    transform: scale(0.97);
 }
 
 /* Status indicators */
