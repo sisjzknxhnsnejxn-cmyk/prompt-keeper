@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
     enabled: true,
     autoRestore: true,
     autoRestoreDelay: 1500,
-    slotPickerTheme: 'dark',
+    slotPickerTheme: 'light',
 };
 
 const AUTO_RESTORE_CONTEXT_TIMEOUT_MS = 2500;
@@ -900,13 +900,13 @@ function saveStatesToMetadata() {
     const chatId = ctx.chatId;
 
     if (!chatId) {
-        toastr.warning('没有活跃的聊天，无法保存。', 'Prompt Keeper');
+        toastr.warning('无活跃聊天', 'Prompt Keeper');
         return false;
     }
 
     const chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
-        toastr.warning('chatMetadata 不可用，无法保存。', 'Prompt Keeper');
+        toastr.warning('元数据不可用', 'Prompt Keeper');
         return false;
     }
 
@@ -914,8 +914,8 @@ function saveStatesToMetadata() {
     if (existingRaw && typeof existingRaw === 'object' && existingRaw.version > METADATA_VERSION) {
         console.warn(LOG_PREFIX, `Refusing to overwrite metadata version ${existingRaw.version} with version ${METADATA_VERSION}. Please update the plugin.`);
         toastr.error(
-            `当前聊天的配置数据由更新版本的 Prompt Keeper (v${existingRaw.version}) 创建，当前插件版本无法安全覆盖。请更新插件后再保存。`,
-            'Prompt Keeper - 版本不兼容',
+            `请更新插件后保存`,
+            '版本不兼容',
             { timeOut: 8000 }
         );
         return false;
@@ -923,7 +923,7 @@ function saveStatesToMetadata() {
 
     const states = readPromptStates();
     if (!states) {
-        toastr.warning('未能读取预设条目状态，请确认预设管理器已加载。', 'Prompt Keeper');
+        toastr.warning('读取状态失败', 'Prompt Keeper');
         return false;
     }
 
@@ -933,7 +933,7 @@ function saveStatesToMetadata() {
     const slotEntries = getSlotEntries(migratedState);
 
     if (!migratedState.slots[presetName] && slotEntries.length >= MAX_SLOTS_PER_CHAT) {
-        toastr.warning(`当前聊天最多保存 ${MAX_SLOTS_PER_CHAT} 个预设槽位，请先删除一个槽位。`, 'Prompt Keeper');
+        toastr.warning(`最多保存 ${MAX_SLOTS_PER_CHAT} 个槽位`, 'Prompt Keeper');
         return false;
     }
 
@@ -958,7 +958,7 @@ function saveStatesToMetadata() {
     updateStatusDisplay(true, now);
 
     toastr.success(
-        `预设槽位「${presetName}」已保存成功！（默认恢复：${migratedState.defaultSlot}）`,
+        '已保存',
         'Prompt Keeper',
         { timeOut: 3000 }
     );
@@ -975,13 +975,13 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
     const isAutoRestore = options.autoRestore === true;
 
     if (!chatId) {
-        if (!silent) toastr.warning('没有活跃的聊天，无法恢复。', 'Prompt Keeper');
+        if (!silent) toastr.warning('无活跃聊天', 'Prompt Keeper');
         return false;
     }
 
     let chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
-        if (!silent) toastr.warning('chatMetadata 不可用，无法恢复。', 'Prompt Keeper');
+        if (!silent) toastr.warning('元数据不可用', 'Prompt Keeper');
         return false;
     }
 
@@ -999,7 +999,7 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
 
     const slotEntries = getSlotEntries(savedState);
     if (!savedState || slotEntries.length === 0) {
-        if (!silent) toastr.info('当前聊天没有保存的预设条目配置。', 'Prompt Keeper');
+        if (!silent) toastr.info('暂无保存配置', 'Prompt Keeper');
         return false;
     }
 
@@ -1008,13 +1008,13 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
 
     const targetSlot = targetSlotName && savedState.slots ? savedState.slots[targetSlotName] : null;
     if (!targetSlot || !targetSlot.prompts) {
-        if (!silent) toastr.warning('选择的预设槽位不可用，可能已被删除。', 'Prompt Keeper');
+        if (!silent) toastr.warning('槽位不可用', 'Prompt Keeper');
         return false;
     }
 
     if (isAutoRestore) {
         toastr.info(
-            `正在恢复当前聊天的默认预设槽位「${targetSlotName || targetSlot.presetName || '默认'}」…`,
+            '正在恢复',
             'Prompt Keeper',
             { timeOut: 1800 }
         );
@@ -1025,8 +1025,8 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
         console.warn(LOG_PREFIX, `Restoring from future version data (v${savedState.version}). Results may be incomplete.`);
         if (!silent) {
             toastr.warning(
-                `此聊天的配置由更新版本的 Prompt Keeper 创建，恢复可能不完整。建议更新插件。`,
-                'Prompt Keeper - 版本提醒',
+                `建议更新插件`,
+                '版本提醒',
                 { timeOut: 6000 }
             );
         }
@@ -1035,9 +1035,9 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
     const dirty = checkDirtyState(targetSlot, { allowPresetSwitch });
     if (!dirty.needsPresetSwitch && !dirty.needsEntryRestore) {
         console.debug(LOG_PREFIX, 'Dirty check passed: current state matches saved state, skipping restore.');
-        if (!silent) toastr.info('当前状态已与保存配置一致，无需恢复。', 'Prompt Keeper');
+        if (!silent) toastr.info('无需恢复', 'Prompt Keeper');
         if (isAutoRestore) {
-            toastr.info(`当前聊天已是默认槽位「${targetSlotName || targetSlot.presetName || '默认'}」。`, 'Prompt Keeper', { timeOut: 1800 });
+            toastr.info('无需恢复', 'Prompt Keeper', { timeOut: 1800 });
         }
         return true;
     }
@@ -1062,7 +1062,7 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
         } else {
             const msg = `无法切换到保存的预设 "${dirty.targetPreset}"，该预设可能已改名或在此设备上不存在。`;
             console.warn(LOG_PREFIX, msg);
-            if (!silent || isAutoRestore) toastr.warning(msg + '请手动切换预设后再尝试恢复。', 'Prompt Keeper', { timeOut: 6000 });
+            if (!silent || isAutoRestore) toastr.warning('切换预设失败', 'Prompt Keeper', { timeOut: 6000 });
             return false;
         }
     }
@@ -1082,16 +1082,16 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
     }
 
     if (skipped.length > 0) {
-        const msg = `以下条目在当前预设中不存在，已跳过：\n${skipped.join(', ')}`;
+        const msg = `已跳过缺失条目`;
         console.warn(LOG_PREFIX, msg);
-        if (!silent) toastr.warning(msg, 'Prompt Keeper - 恢复提醒', { timeOut: 8000 });
+        if (!silent) toastr.warning(msg, '恢复提醒', { timeOut: 8000 });
     }
 
-    const presetInfo = presetSwitched ? `（已切换预设: ${dirty.targetPreset}）` : '';
+    const presetInfo = presetSwitched ? '，已切预设' : '';
     if (!silent) {
-        toastr.success(`预设槽位「${targetSlotName || targetSlot.presetName || '默认'}」已恢复。${presetInfo}`, 'Prompt Keeper');
+        toastr.success(`已恢复${presetInfo}`, 'Prompt Keeper');
     } else {
-        toastr.success(`已自动恢复默认槽位「${targetSlotName || targetSlot.presetName || '默认'}」。${presetInfo}`, 'Prompt Keeper', { timeOut: 2500 });
+        toastr.success(`已自动恢复${presetInfo}`, 'Prompt Keeper', { timeOut: 2500 });
     }
 
     console.log(LOG_PREFIX, `Restored prompt states for chat: ${chatId}, preset switched: ${presetSwitched}`);
@@ -1108,13 +1108,13 @@ function deleteSlotFromMetadata(slotName) {
     const chatId = ctx.chatId;
 
     if (!chatId) {
-        toastr.warning('没有活跃的聊天，无法删除。', 'Prompt Keeper');
+        toastr.warning('无活跃聊天', 'Prompt Keeper');
         return false;
     }
 
     const chatMetadata = ctx.chatMetadata;
     if (!chatMetadata) {
-        toastr.warning('chatMetadata 不可用，无法删除。', 'Prompt Keeper');
+        toastr.warning('元数据不可用', 'Prompt Keeper');
         return false;
     }
 
@@ -1135,11 +1135,11 @@ function deleteSlotFromMetadata(slotName) {
             justSavedChatId = null;
         }
         console.log(LOG_PREFIX, `Deleted saved slot for chat: ${chatId}, slot: ${slotName}`);
-        toastr.success(`已删除预设槽位「${slotName}」。`, 'Prompt Keeper');
+        toastr.success('已删除', 'Prompt Keeper');
         updateStatusDisplay(remaining.length > 0, getSavedAt());
         return true;
     } else {
-        toastr.info('当前聊天没有可删除的预设槽位。', 'Prompt Keeper');
+        toastr.info('无可删槽位', 'Prompt Keeper');
         return false;
     }
 }
@@ -1306,11 +1306,30 @@ function toggleSlotPickerTheme() {
     if ($modal.length === 0) return;
     const isLight = $modal.hasClass('pk-modal-light');
     const nextTheme = isLight ? 'dark' : 'light';
-    $modal.toggleClass('pk-modal-light', nextTheme === 'light').toggleClass('pk-modal-dark', nextTheme === 'dark');
+    applySlotPickerTheme($modal, nextTheme);
 
     const settings = loadPluginSettings();
     settings.slotPickerTheme = nextTheme;
     savePluginSettings();
+}
+
+function getSlotPickerThemeLabel(theme) {
+    return theme === 'light' ? '☀ 日间' : '🌙 夜间';
+}
+
+function applySlotPickerTheme($modal, theme) {
+    $modal
+        .toggleClass('pk-modal-light', theme === 'light')
+        .toggleClass('pk-modal-dark', theme === 'dark');
+    $modal.find('.pk-modal-theme').text(getSlotPickerThemeLabel(theme));
+}
+
+function animatePressedButton($btn) {
+    if (!$btn || !$btn.length) return;
+    $btn.removeClass('pk-btn-active');
+    void $btn[0].offsetWidth;
+    $btn.addClass('pk-btn-active');
+    setTimeout(() => $btn.removeClass('pk-btn-active'), 220);
 }
 
 function showSlotPicker(mode) {
@@ -1322,22 +1341,22 @@ function showSlotPicker(mode) {
     const slotEntries = getSlotEntries(savedState);
 
     if (slotEntries.length === 0) {
-        toastr.info('当前聊天没有保存的预设槽位。', 'Prompt Keeper');
+        toastr.info('暂无保存槽位', 'Prompt Keeper');
         return;
     }
 
     closeSlotPicker();
 
     const isDelete = mode === 'delete';
-    const title = isDelete ? '删除预设槽位' : '恢复预设槽位';
+    const title = isDelete ? '删除槽位' : '恢复槽位';
     const settings = loadPluginSettings();
-    const theme = settings.slotPickerTheme === 'light' ? 'light' : 'dark';
+    const theme = settings.slotPickerTheme === 'dark' ? 'dark' : 'light';
     const $modal = jQuery(`
         <div id="prompt-keeper-modal" class="pk-modal-overlay pk-modal-${theme}">
             <div class="pk-modal-card" role="dialog" aria-modal="true" aria-label="${title}">
                 <div class="pk-modal-header">
                     <strong>${title}</strong>
-                    <button type="button" class="pk-modal-theme" title="切换日夜间">日/夜</button>
+                    <button type="button" class="pk-modal-theme" title="切换主题">${getSlotPickerThemeLabel(theme)}</button>
                 </div>
                 <div class="pk-modal-list"></div>
                 <button type="button" class="pk-modal-cancel">取消</button>
@@ -1364,11 +1383,12 @@ function showSlotPicker(mode) {
             e.stopPropagation();
             if (!shouldHandleInteraction($item[0]) || $item.prop('disabled')) return;
 
+            animatePressedButton($item);
             $item.addClass('pk-slot-selected pk-slot-working').prop('disabled', true);
             $list.find('.pk-slot-item').not($item).prop('disabled', true).addClass('pk-slot-disabled');
 
             if (isDelete) {
-                const confirmed = window.confirm(`确认删除预设槽位「${name}」吗？`);
+                const confirmed = window.confirm('删除此槽位？');
                 if (!confirmed) {
                     $item.removeClass('pk-slot-selected pk-slot-working').prop('disabled', false);
                     $list.find('.pk-slot-item').not($item).prop('disabled', false).removeClass('pk-slot-disabled');
@@ -1376,7 +1396,7 @@ function showSlotPicker(mode) {
                 }
                 deleteSlotFromMetadata(name);
             } else {
-                $item.find('.pk-slot-time').text('正在恢复，请稍候…');
+                $item.find('.pk-slot-time').text('恢复中…');
                 await restoreStatesFromMetadata(false, name);
             }
             closeSlotPicker();
@@ -1394,12 +1414,14 @@ function showSlotPicker(mode) {
         e.preventDefault();
         e.stopPropagation();
         if (!shouldHandleInteraction(themeButton)) return;
+        animatePressedButton(jQuery(themeButton));
         toggleSlotPickerTheme();
     };
     const onCancelPress = function (e) {
         e.preventDefault();
         e.stopPropagation();
         if (!shouldHandleInteraction(cancelButton)) return;
+        animatePressedButton(jQuery(cancelButton));
         closeSlotPicker();
     };
 
@@ -1575,10 +1597,7 @@ function executeButtonAction(action, $btn) {
     lastButtonActionTime = now;
 
     // 视觉反馈：按钮短暂高亮
-    if ($btn && $btn.length) {
-        $btn.addClass('pk-btn-active');
-        setTimeout(() => $btn.removeClass('pk-btn-active'), 200);
-    }
+    animatePressedButton($btn);
 
     action();
 }
@@ -1770,9 +1789,9 @@ function loadSettingsPanel() {
         s.enabled = jQuery(this).prop('checked');
         savePluginSettings();
         if (s.enabled) {
-            toastr.success('Prompt Keeper 已启用', 'Prompt Keeper');
+            toastr.success('已启用', 'Prompt Keeper');
         } else {
-            toastr.info('Prompt Keeper 已禁用', 'Prompt Keeper');
+            toastr.info('已禁用', 'Prompt Keeper');
             if (autoRestoreTimer) {
                 clearTimeout(autoRestoreTimer);
                 autoRestoreTimer = null;
@@ -1785,9 +1804,9 @@ function loadSettingsPanel() {
         s.autoRestore = jQuery(this).prop('checked');
         savePluginSettings();
         if (s.autoRestore) {
-            toastr.success('自动恢复已启用', 'Prompt Keeper');
+            toastr.success('自动恢复已开', 'Prompt Keeper');
         } else {
-            toastr.info('自动恢复已禁用，切换聊天后需手动恢复', 'Prompt Keeper');
+            toastr.info('自动恢复已关', 'Prompt Keeper');
             if (autoRestoreTimer) {
                 clearTimeout(autoRestoreTimer);
                 autoRestoreTimer = null;
