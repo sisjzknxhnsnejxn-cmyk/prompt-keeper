@@ -6,22 +6,33 @@
     gap: 6px;
     padding: 8px 10px;
     margin: 8px 0;
+    width: 100%;
+    max-width: 100%;
     border: 1px solid var(--SmartThemeBorderColor, #555);
     border-radius: 6px;
     background-color: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
     position: relative;
     z-index: 5;
+    box-sizing: border-box;
     pointer-events: auto;
     transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .prompt-keeper-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     font-size: 0.9em;
     font-weight: 600;
     color: var(--SmartThemeBodyColor, #ccc);
+    line-height: 1.35;
+    min-width: 0;
+}
+
+.prompt-keeper-header > span:not(#prompt-keeper-status) {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .prompt-keeper-header i {
@@ -30,18 +41,24 @@
 
 .prompt-keeper-btn-group {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
+    width: 100%;
+    min-width: 0;
 }
 
 .prompt-keeper-btn-group .menu_button {
-    flex: 1;
+    flex: 1 1 96px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     font-size: 0.85em;
-    min-height: 32px;
+    line-height: 1.2;
+    min-width: 0;
+    min-height: 40px;
+    box-sizing: border-box;
     position: relative;
     z-index: 1;
     /* iOS Safari fix: ensure buttons are visually and functionally clickable */
@@ -76,6 +93,13 @@
     pointer-events: none;
 }
 
+.prompt-keeper-btn-group .menu_button span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .prompt-keeper-btn-group .menu_button:active,
 .prompt-keeper-btn-group .menu_button.pk-btn-active {
     opacity: 0.82;
@@ -88,12 +112,16 @@
     color: var(--SmartThemeQuoteColor, #7c7);
     font-size: 0.8em;
     margin-left: auto;
+    max-width: 100%;
+    white-space: nowrap;
 }
 
 .pk-not-saved {
     color: var(--SmartThemeEmColor, #fa0);
     font-size: 0.8em;
     margin-left: auto;
+    max-width: 100%;
+    white-space: nowrap;
 }
 
 /* Slot picker modal */
@@ -106,6 +134,7 @@
     justify-content: center;
     min-height: 100vh;
     min-height: 100dvh;
+    min-height: 100svh;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     background: rgba(0, 0, 0, 0.55);
     touch-action: manipulation;
@@ -114,8 +143,10 @@
 }
 
 #prompt-keeper-modal .pk-modal-card {
-    width: min(300px, calc(100vw - 32px));
-    max-height: min(70dvh, 560px);
+    width: min(420px, calc(100vw - 32px));
+    max-width: 100%;
+    max-height: min(72dvh, 560px);
+    max-height: min(72svh, 560px);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -124,6 +155,7 @@
     border-radius: 12px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
     overflow: hidden;
+    box-sizing: border-box;
     transform: translateY(0) scale(1);
     animation: pk-modal-pop-in 0.18s ease-out;
     transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
@@ -141,9 +173,16 @@
 
 .pk-modal-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    min-width: 0;
+}
+
+.pk-modal-header strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .pk-modal-theme,
@@ -163,6 +202,7 @@
 .pk-modal-theme {
     flex: 0 0 auto;
     padding: 6px 10px;
+    min-height: 36px;
     border-radius: 999px;
     background: var(--SmartThemeQuoteColor, #555);
     color: #fff;
@@ -189,7 +229,10 @@
     flex-direction: column;
     gap: 8px;
     overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding-right: 2px;
+    min-height: 0;
 }
 
 .pk-slot-item {
@@ -198,11 +241,13 @@
     align-items: stretch;
     gap: 4px;
     width: 100%;
+    min-height: 44px;
     padding: 10px 12px;
     border-radius: 10px;
     background: rgba(127, 127, 127, 0.12);
     color: inherit;
     text-align: left;
+    box-sizing: border-box;
 }
 
 .pk-slot-item:active,
@@ -231,13 +276,16 @@
 
 .pk-slot-main {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    min-width: 0;
 }
 
 .pk-slot-name {
+    min-width: 0;
     font-weight: 600;
-    word-break: break-all;
+    overflow-wrap: anywhere;
 }
 
 .pk-slot-default {
@@ -252,11 +300,14 @@
 .pk-slot-time {
     color: var(--SmartThemeBodyColor, #aaa);
     font-size: 0.82em;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
 .pk-modal-cancel {
     margin-top: auto;
     padding: 10px 12px;
+    min-height: 44px;
     border-radius: 10px;
     background: rgba(127, 127, 127, 0.18);
     color: inherit;
@@ -293,6 +344,37 @@
 }
 
 @media (max-width: 480px) {
+    .prompt-keeper-bar {
+        gap: 8px;
+        padding: 10px;
+        border-radius: 10px;
+    }
+
+    .prompt-keeper-header {
+        gap: 6px;
+        font-size: 0.92em;
+    }
+
+    .pk-saved,
+    .pk-not-saved {
+        flex: 1 0 100%;
+        margin-left: 0;
+        white-space: normal;
+    }
+
+    .prompt-keeper-btn-group {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .prompt-keeper-btn-group .menu_button {
+        min-height: 44px;
+        padding: 7px 6px;
+        gap: 3px;
+        font-size: 0.82em;
+    }
+
     #prompt-keeper-modal.pk-modal-overlay {
         align-items: center;
         justify-content: center;
@@ -300,14 +382,72 @@
     }
 
     #prompt-keeper-modal .pk-modal-card {
-        width: min(340px, 100%);
+        width: 100%;
         max-height: calc(100dvh - max(36px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)));
+        max-height: calc(100svh - max(36px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)));
         border-radius: 18px;
         padding: 14px;
+    }
+
+    .pk-modal-theme {
+        padding-inline: 9px;
+        font-size: 0.82em;
+    }
+}
+
+@media (max-width: 360px) {
+    .prompt-keeper-btn-group .menu_button {
+        flex-direction: column;
+        font-size: 0.78em;
+    }
+}
+
+@media (pointer: coarse) {
+    .prompt-keeper-btn-group .menu_button,
+    .pk-modal-theme,
+    .pk-modal-cancel,
+    .pk-slot-item {
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .prompt-keeper-btn-group .menu_button:hover,
+    .pk-modal-theme:hover,
+    .pk-modal-cancel:hover,
+    .pk-slot-item:hover {
+        transform: none;
+        box-shadow: none;
+    }
+}
+
+@media (min-width: 481px) and (max-width: 900px) {
+    .prompt-keeper-btn-group .menu_button {
+        min-height: 42px;
+    }
+
+    #prompt-keeper-modal .pk-modal-card {
+        width: min(460px, calc(100vw - 48px));
+    }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+    #prompt-keeper-modal.pk-modal-overlay {
+        align-items: stretch;
+        padding-top: max(8px, env(safe-area-inset-top));
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    #prompt-keeper-modal .pk-modal-card {
+        max-height: calc(100dvh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
+        max-height: calc(100svh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
     }
 }
 
 @supports not (height: 100dvh) {
+    #prompt-keeper-modal.pk-modal-overlay {
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+    }
+
     #prompt-keeper-modal .pk-modal-card {
         max-height: min(70vh, 560px);
     }
