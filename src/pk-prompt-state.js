@@ -30,6 +30,7 @@ function readPromptStates() {
             let promptOrder = null;
             if (Array.isArray(oaiSettings.prompt_order)) {
                 promptOrder = JSON.parse(JSON.stringify(oaiSettings.prompt_order));
+                normalizePromptOrderEnabled(promptOrder, prompts);
             }
 
             if (Object.keys(prompts).length > 0) {
@@ -42,6 +43,20 @@ function readPromptStates() {
     }
 
     return readPromptStatesFromDOM();
+}
+
+function normalizePromptOrderEnabled(promptOrder, prompts) {
+    if (!Array.isArray(promptOrder) || !prompts) return;
+
+    for (const entry of promptOrder) {
+        if (!entry || !Array.isArray(entry.order)) continue;
+        for (const item of entry.order) {
+            if (!item || typeof item !== 'object' || !item.identifier) continue;
+            if (prompts[item.identifier] !== undefined) {
+                item.enabled = prompts[item.identifier];
+            }
+        }
+    }
 }
 
 /**
@@ -190,29 +205,7 @@ function applyPromptStates(savedState, chatIdAtStart) {
 
         if (oaiSettings && Array.isArray(oaiSettings.prompts)) {
             const currentIdentifiers = new Set(oaiSettings.prompts.map(p => p.identifier).filter(Boolean));
-
-            for (const [identifier, enabled] of Object.entries(savedPrompts)) {
-                if (!currentIdentifiers.has(identifier)) {
-                    skipped.push(identifier);
-                    continue;
-                }
-                const prompt = oaiSettings.prompts.find(p => p.identifier === identifier);
-                if (prompt) {
-                    prompt.enabled = enabled;
-                }
-            }
-
-            if (Array.isArray(oaiSettings.prompt_order)) {
-                for (const entry of oaiSettings.prompt_order) {
-                    if (Array.isArray(entry.order)) {
-                        for (const item of entry.order) {
-                            if (item.identifier && savedPrompts[item.identifier] !== undefined) {
-                                item.enabled = savedPrompts[item.identifier];
-                            }
-                        }
-                    }
-                }
-            }
+            syncPromptEnabledStates(oaiSettings, savedPrompts, currentIdentifiers, skipped);
 
             if (savedOrder && Array.isArray(savedOrder) && Array.isArray(oaiSettings.prompt_order)) {
                 if (savedOrder.length > 0 && typeof savedOrder[0] === 'object') {
@@ -220,6 +213,16 @@ function applyPromptStates(savedState, chatIdAtStart) {
                 } else if (savedOrder.length > 0 && typeof savedOrder[0] === 'string') {
                     applyOrderFromIdentifierList(oaiSettings, savedOrder, currentIdentifiers, skipped);
                 }
+            }
+
+            // prompt_order 的历史快照也可能带 enabled。合并顺序后，必须再次以槽位 prompts 为最终权威，
+            // 避免同一预设不同槽位恢复时被 savedOrder 或多份 prompt_order entry 反向覆盖。
+            syncPromptEnabledStates(oaiSettings, savedPrompts, currentIdentifiers);
+
+            const mismatched = findPromptEnabledMismatches(oaiSettings, savedPrompts, currentIdentifiers);
+            if (mismatched.length > 0) {
+                console.debug(LOG_PREFIX, `Detected ${mismatched.length} prompt state mismatch(es) after restore, applying one more precise sync.`, mismatched);
+                syncPromptEnabledStates(oaiSettings, savedPrompts, currentIdentifiers);
             }
 
             if (ctx.saveSettingsDebounced) {
@@ -240,6 +243,60 @@ function applyPromptStates(savedState, chatIdAtStart) {
 
     applyPromptStatesDOM(savedPrompts, skipped);
     return { skipped, aborted: false };
+}
+
+function syncPromptEnabledStates(oaiSettings, savedPrompts, currentIdentifiers, skipped = null) {
+    if (!oaiSettings || !savedPrompts) return;
+
+    const promptMap = new Map(Array.isArray(oaiSettings.prompts)
+        ? oaiSettings.prompts.map(prompt => [prompt.identifier, prompt])
+        : []);
+
+    for (const [identifier, enabled] of Object.entries(savedPrompts)) {
+        if (currentIdentifiers && !currentIdentifiers.has(identifier)) {
+            if (skipped && !skipped.includes(identifier)) skipped.push(identifier);
+            continue;
+        }
+
+        const prompt = promptMap.get(identifier);
+        if (prompt) {
+            prompt.enabled = enabled;
+        }
+    }
+
+    if (Array.isArray(oaiSettings.prompt_order)) {
+        normalizePromptOrderEnabled(oaiSettings.prompt_order, savedPrompts);
+    }
+}
+
+function findPromptEnabledMismatches(oaiSettings, savedPrompts, currentIdentifiers) {
+    const mismatched = [];
+    if (!oaiSettings || !savedPrompts) return mismatched;
+
+    if (Array.isArray(oaiSettings.prompts)) {
+        for (const prompt of oaiSettings.prompts) {
+            if (!prompt || !prompt.identifier || savedPrompts[prompt.identifier] === undefined) continue;
+            if (currentIdentifiers && !currentIdentifiers.has(prompt.identifier)) continue;
+            if ((prompt.enabled !== false) !== savedPrompts[prompt.identifier]) {
+                mismatched.push(prompt.identifier);
+            }
+        }
+    }
+
+    if (Array.isArray(oaiSettings.prompt_order)) {
+        for (const entry of oaiSettings.prompt_order) {
+            if (!entry || !Array.isArray(entry.order)) continue;
+            for (const item of entry.order) {
+                if (!item || !item.identifier || savedPrompts[item.identifier] === undefined) continue;
+                if (currentIdentifiers && !currentIdentifiers.has(item.identifier)) continue;
+                if ((item.enabled !== false) !== savedPrompts[item.identifier]) {
+                    mismatched.push(item.identifier);
+                }
+            }
+        }
+    }
+
+    return [...new Set(mismatched)];
 }
 
 /**
@@ -391,5 +448,6 @@ function applyPromptStatesDOM(savedPrompts, skipped) {
 }
 
 // ========== Prompt Manager UI Refresh ==========
+
 
 

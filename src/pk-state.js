@@ -67,10 +67,24 @@ function normalizePresetKey(name) {
     return normalizeSlotName(name).toLowerCase();
 }
 
-function findSlotName(state, presetName) {
+function findSlotName(state, presetName, options = {}) {
     if (!state || !state.slots || !presetName) return null;
 
     const normalizedPreset = normalizePresetKey(presetName);
+    const preferExactSlotName = options.preferExactSlotName === true;
+
+    if (preferExactSlotName) {
+        for (const [slotName] of getSlotEntries(state)) {
+            if (normalizePresetKey(slotName) === normalizedPreset) return slotName;
+        }
+
+        for (const [slotName, slot] of getSlotEntries(state)) {
+            if (slot && normalizePresetKey(slot.presetName) === normalizedPreset) return slotName;
+        }
+
+        return null;
+    }
+
     for (const [slotName, slot] of getSlotEntries(state)) {
         if (normalizePresetKey(slotName) === normalizedPreset) return slotName;
         if (slot && normalizePresetKey(slot.presetName) === normalizedPreset) return slotName;
@@ -110,7 +124,10 @@ function getBestRestoreSlotName(state, requestedSlotName = null) {
     if (targetSlotName) return targetSlotName;
 
     const currentPresetName = getCurrentPresetName();
-    targetSlotName = findSlotName(state, currentPresetName);
+    const settings = loadPluginSettings();
+    targetSlotName = findSlotName(state, currentPresetName, {
+        preferExactSlotName: settings.customSaveName !== true,
+    });
     if (targetSlotName) return targetSlotName;
 
     return getDefaultSlotName(state);

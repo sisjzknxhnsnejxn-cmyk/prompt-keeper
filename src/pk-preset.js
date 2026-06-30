@@ -44,7 +44,8 @@ async function tryRefreshPromptManagerUI() {
 
                     const $checkbox = $row.find('input[type="checkbox"]').first();
                     if ($checkbox.length > 0 && $checkbox.prop('checked') !== enabledMap[identifier]) {
-                        $checkbox.prop('checked', enabledMap[identifier]).trigger('change');
+                        // 这里只同步显示层，不触发 change，避免 Prompt Manager 用旧 DOM 事件链反向覆盖刚恢复的底层状态。
+                        $checkbox.prop('checked', enabledMap[identifier]);
                         synced++;
                     }
                 });
@@ -229,5 +230,6 @@ async function switchToPreset(presetName) {
 }
 
 // ========== Core: Save / Restore / Delete ==========
+
 
 

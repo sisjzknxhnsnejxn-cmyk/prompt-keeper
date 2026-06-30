@@ -58,7 +58,6 @@ const SETTINGS_HTML = `
                 <label><strong>恢复方式：</strong> 自动（切换聊天时延迟恢复）或手动</label>
                 <label><strong>保存位置：</strong> 当前聊天的元数据中</label>
                 <label><strong>自定义名称：</strong> 开启后，同一预设可保存多个不同槽位</label>
-                <label><strong>更新方式：</strong> 更新插件文件后，如扩展管理器重新执行入口会自动热重载；也可在控制台执行 <code>window.PromptKeeperReload()</code> 手动热重载，通常无需刷新页面或重启后端</label>
             </div>
         </details>
     </div>
