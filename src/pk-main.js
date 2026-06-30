@@ -33,7 +33,7 @@ function _pkInit() {
         tryInjectUI();
         startUIObserver();
         requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
-        console.log(LOG_PREFIX, 'Plugin v2.0.1 initialized (APP_READY).');
+        console.log(LOG_PREFIX, 'Plugin v2.0.3 initialized (APP_READY).');
     });
 
     eventSource.on(eventTypes.CHAT_CHANGED, () => {
@@ -59,7 +59,7 @@ function _pkInit() {
         eventSource.on(eventTypes.MAIN_API_CHANGED, onMainApiChanged);
     }
 
-    console.log(LOG_PREFIX, 'Plugin v2.0.1 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v2.0.3 loaded, waiting for APP_READY...');
 }
 
 _pkInit();

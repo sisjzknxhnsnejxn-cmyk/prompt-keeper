@@ -3,7 +3,7 @@
  * Saves and restores Prompt Manager entry states (enabled + order) AND the active preset per chat session.
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.0.1
+ * @version 2.0.3
  * @license MIT
  */
 
@@ -96,6 +96,3 @@ const INTERACTION_DEBOUNCE_MS = 450;
 let promptKeeperEventHandlersBound = false;
 let promptKeeperAppReadyHandled = false;
 let promptKeeperRefreshingUI = false;
-
-
-
