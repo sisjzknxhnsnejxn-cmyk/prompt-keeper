@@ -27,81 +27,93 @@ function getSaveSlotName(currentPresetName, existingSlots) {
 
 async function saveStatesToMetadata() {
     if (!isPluginEnabled()) return false;
-
-    const ctx = getCtx();
-    const chatId = ctx.chatId;
-
-    if (!chatId) {
-        toastr.warning('无活跃聊天', 'Prompt Keeper');
+    if (saveInProgress) {
+        console.debug(LOG_PREFIX, 'Save skipped: another save is already in progress.');
         return false;
     }
 
-    const chatMetadata = ctx.chatMetadata;
-    if (!chatMetadata) {
-        toastr.warning('元数据不可用', 'Prompt Keeper');
-        return false;
-    }
+    saveInProgress = true;
 
-    const existingRaw = chatMetadata[METADATA_KEY];
-    if (existingRaw && typeof existingRaw === 'object' && existingRaw.version > METADATA_VERSION) {
-        console.warn(LOG_PREFIX, `Refusing to overwrite metadata version ${existingRaw.version} with version ${METADATA_VERSION}. Please update the plugin.`);
-        toastr.error(
-            `请更新插件后保存`,
-            '版本不兼容',
-            { timeOut: 8000 }
+    try {
+        const ctx = getCtx();
+        const chatId = ctx.chatId;
+
+        if (!chatId) {
+            toastr.warning('无活跃聊天', 'Prompt Keeper');
+            return false;
+        }
+
+        const chatMetadata = ctx.chatMetadata;
+        if (!chatMetadata) {
+            toastr.warning('元数据不可用', 'Prompt Keeper');
+            return false;
+        }
+
+        const existingRaw = chatMetadata[METADATA_KEY];
+        if (existingRaw && typeof existingRaw === 'object' && existingRaw.version > METADATA_VERSION) {
+            console.warn(LOG_PREFIX, `Refusing to overwrite metadata version ${existingRaw.version} with version ${METADATA_VERSION}. Please update the plugin.`);
+            toastr.error(
+                `请更新插件后保存`,
+                '版本不兼容',
+                { timeOut: 8000 }
+            );
+            return false;
+        }
+
+        const states = readPromptStates();
+        if (!states) {
+            toastr.warning('读取状态失败', 'Prompt Keeper');
+            return false;
+        }
+
+        const presetName = normalizeSlotName(getCurrentPresetName());
+        const now = Date.now();
+        const migratedState = migrateState(existingRaw) || { version: METADATA_VERSION, defaultSlot: null, slots: {} };
+        const slotEntries = getSlotEntries(migratedState);
+        const slotName = getSaveSlotName(presetName, migratedState.slots);
+
+        if (!slotName) {
+            console.debug(LOG_PREFIX, 'Save cancelled: no slot name selected.');
+            return false;
+        }
+
+        if (!migratedState.slots[slotName] && slotEntries.length >= MAX_SLOTS_PER_CHAT) {
+            toastr.warning(`最多保存 ${MAX_SLOTS_PER_CHAT} 个槽位`, 'Prompt Keeper');
+            return false;
+        }
+
+        const stateToSave = {
+            prompts: states.prompts,
+            savedAt: now,
+            presetName,
+        };
+        if (states.promptOrder != null) stateToSave.promptOrder = states.promptOrder;
+
+        migratedState.version = METADATA_VERSION;
+        migratedState.slots[slotName] = stateToSave;
+        migratedState.defaultSlot = slotName;
+
+        chatMetadata[METADATA_KEY] = migratedState;
+
+        persistChatMetadata();
+
+        justSavedChatId = chatId;
+
+        console.log(LOG_PREFIX, `Saved prompt states for chat: ${chatId}, slot: ${slotName}, preset: ${presetName}`);
+        updateStatusDisplay(true, now);
+
+        toastr.success(
+            `已保存：${slotName}`,
+            'Prompt Keeper',
+            { timeOut: 3000 }
         );
-        return false;
+
+        return true;
+    } finally {
+        setTimeout(() => {
+            saveInProgress = false;
+        }, BUTTON_DEBOUNCE_MS);
     }
-
-    const states = readPromptStates();
-    if (!states) {
-        toastr.warning('读取状态失败', 'Prompt Keeper');
-        return false;
-    }
-
-    const presetName = normalizeSlotName(getCurrentPresetName());
-    const now = Date.now();
-    const migratedState = migrateState(existingRaw) || { version: METADATA_VERSION, defaultSlot: null, slots: {} };
-    const slotEntries = getSlotEntries(migratedState);
-    const slotName = getSaveSlotName(presetName, migratedState.slots);
-
-    if (!slotName) {
-        console.debug(LOG_PREFIX, 'Save cancelled: no slot name selected.');
-        return false;
-    }
-
-    if (!migratedState.slots[slotName] && slotEntries.length >= MAX_SLOTS_PER_CHAT) {
-        toastr.warning(`最多保存 ${MAX_SLOTS_PER_CHAT} 个槽位`, 'Prompt Keeper');
-        return false;
-    }
-
-    const stateToSave = {
-        prompts: states.prompts,
-        savedAt: now,
-        presetName,
-    };
-    if (states.promptOrder != null) stateToSave.promptOrder = states.promptOrder;
-
-    migratedState.version = METADATA_VERSION;
-    migratedState.slots[slotName] = stateToSave;
-    migratedState.defaultSlot = slotName;
-
-    chatMetadata[METADATA_KEY] = migratedState;
-
-    persistChatMetadata();
-
-    justSavedChatId = chatId;
-
-    console.log(LOG_PREFIX, `Saved prompt states for chat: ${chatId}, slot: ${slotName}, preset: ${presetName}`);
-    updateStatusDisplay(true, now);
-
-    toastr.success(
-        `已保存：${slotName}`,
-        'Prompt Keeper',
-        { timeOut: 3000 }
-    );
-
-    return true;
 }
 
 async function restoreStatesFromMetadata(silent = false, slotName = null, options = {}) {
@@ -387,6 +399,7 @@ function onMainApiChanged() {
 }
 
 // ========== UI ==========
+
 
 
 

@@ -2,36 +2,27 @@
  * Prompt Keeper - SillyTavern Plugin loader
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.0.3
+ * @version 2.1.0
  * @license MIT
  */
 
 (function loadPromptKeeperScripts() {
     // SillyTavern 的部分设置页/正则页刷新会重新执行扩展入口。
-    // 子脚本里存在 const 顶层声明，重复注入会导致 “Identifier has already been declared”，
-    // 因此入口层做 loading/loaded 状态保护，避免重复加载，也避免失败后永久跳过。
+    // 为支持更新扩展后不刷新页面即可使用新版代码，入口层通过 fetch + Function
+    // 将拆分脚本放入同一个隔离作用域执行，避免重复注入 <script> 后触发
+    // “Identifier has already been declared”。
     const LOADER_STATE_KEY = '__promptKeeperLoaderState';
     const LEGACY_LOADED_KEY = '__promptKeeperLoaded';
     const PLUGIN_FOLDER = 'prompt-keeper';
     const SCRIPT_LOAD_TIMEOUT_MS = 15000;
 
     const previousState = window[LOADER_STATE_KEY];
-    if (previousState && previousState.status === 'loaded') {
-        console.debug('[PromptKeeper] Loader skipped: already loaded.');
-        return;
-    }
+    let baseUrl = null;
 
-    if (previousState && previousState.status === 'loading') {
-        console.debug('[PromptKeeper] Loader skipped: already loading.');
-        return;
-    }
-
-    window[LOADER_STATE_KEY] = {
-        status: 'loading',
-        startedAt: Date.now(),
+    window.PromptKeeperReload = async function PromptKeeperReload() {
+        console.info('[PromptKeeper] 正在热重载插件文件；无需刷新页面或重启 SillyTavern 后端。');
+        await loadPromptKeeperRuntime({ force: true });
     };
-    // 保留旧标记，兼容之前版本的重复加载保护。
-    window[LEGACY_LOADED_KEY] = false;
 
     const scriptNames = [
         'pk-constants.js',
@@ -78,41 +69,142 @@
         return new URL(`/scripts/extensions/third-party/${PLUGIN_FOLDER}/src/`, window.location.origin).toString();
     };
 
-    const baseUrl = getExtensionBaseUrl();
-    const cacheBust = `v=2.0.3&t=${Date.now()}`;
-
-    const loadScript = (name) => new Promise((resolve, reject) => {
-        const script = document.createElement('script');
+    const fetchScript = async (name, cacheBust) => {
         const scriptUrl = new URL(name, baseUrl);
         scriptUrl.searchParams.set('pk', cacheBust);
-        script.src = scriptUrl.toString();
-        script.async = false;
-        script.dataset.promptKeeperPart = name;
 
-        const timeoutId = setTimeout(() => {
-            reject(new Error('Timed out loading Prompt Keeper script: ' + name));
-        }, SCRIPT_LOAD_TIMEOUT_MS);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), SCRIPT_LOAD_TIMEOUT_MS);
 
-        script.onload = () => {
+        try {
+            const response = await fetch(scriptUrl.toString(), {
+                cache: 'no-store',
+                signal: controller.signal,
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status} ${response.statusText}`);
+            }
+            return `\n//# sourceURL=${scriptUrl.toString()}\n${await response.text()}\n`;
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                throw new Error('Timed out loading Prompt Keeper script: ' + name);
+            }
+            throw new Error('Failed to load Prompt Keeper script: ' + name + ' from ' + scriptUrl.toString() + ' (' + (error && error.message ? error.message : error) + ')');
+        } finally {
             clearTimeout(timeoutId);
-            resolve();
-        };
-        script.onerror = () => {
-            clearTimeout(timeoutId);
-            reject(new Error('Failed to load Prompt Keeper script: ' + name + ' from ' + script.src));
-        };
-        document.head.appendChild(script);
-    });
+        }
+    };
 
-    scriptNames.reduce((chain, name) => chain.then(() => loadScript(name)), Promise.resolve())
-        .then(() => {
+    const removeLegacyScriptTags = () => {
+        document.querySelectorAll('script[data-prompt-keeper-part]').forEach((script) => script.remove());
+    };
+
+    const destroyCurrentRuntime = () => {
+        const runtime = window.PromptKeeper;
+        if (runtime && typeof runtime.destroy === 'function') {
+            try {
+                runtime.destroy('reload');
+            } catch (error) {
+                console.warn('[PromptKeeper] Runtime destroy failed during reload:', error);
+            }
+        }
+        removeLegacyScriptTags();
+    };
+
+    async function loadPromptKeeperRuntime(options = {}) {
+        const force = options.force === true;
+        const state = window[LOADER_STATE_KEY];
+
+        if (!force && state && state.status === 'loaded') {
+            console.debug('[PromptKeeper] Runtime load skipped: already loaded. Run window.PromptKeeperReload() to hot-reload updated files.');
+            return window.PromptKeeper;
+        }
+        if (!force && state && state.status === 'loading') {
+            console.debug('[PromptKeeper] Runtime load skipped: another load is in progress.');
+            return window.PromptKeeper;
+        }
+
+        baseUrl = getExtensionBaseUrl();
+        const cacheBust = `v=2.1.0&t=${Date.now()}`;
+
+        window[LOADER_STATE_KEY] = {
+            status: 'loading',
+            startedAt: Date.now(),
+            baseUrl,
+            hotReload: force,
+        };
+        window[LEGACY_LOADED_KEY] = false;
+
+        const parts = [];
+        for (const name of scriptNames) {
+            parts.push(await fetchScript(name, cacheBust));
+        }
+
+        if (force) {
+            destroyCurrentRuntime();
+        }
+
+        const runtimeId = `pk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const footer = `
+;window.PromptKeeper = Object.assign(window.PromptKeeper || {}, {
+    id: ${JSON.stringify(runtimeId)},
+    version: '2.1.0',
+    loadedAt: Date.now(),
+    baseUrl: ${JSON.stringify(baseUrl)},
+    reload: window.PromptKeeperReload,
+    destroy: typeof destroyPromptKeeper === 'function' ? destroyPromptKeeper : function () {},
+    init: typeof _pkInit === 'function' ? _pkInit : null,
+    updateStatusDisplay: typeof updateStatusDisplay === 'function' ? updateStatusDisplay : null,
+    hasSavedState: typeof hasSavedState === 'function' ? hasSavedState : null,
+});
+[
+    'loadSettingsPanel', 'tryInjectUI', 'startUIObserver', 'updateStatusDisplay',
+    'hasSavedState', 'getSavedAt', 'onChatChanged', 'onChatLoaded',
+    'onPresetChanged', 'onMainApiChanged', 'saveStatesToMetadata',
+    'restoreStatesFromMetadata', 'deleteStateFromMetadata', 'showSlotPicker'
+].forEach(function (name) {
+    try {
+        if (typeof eval(name) === 'function') window[name] = eval(name);
+    } catch (_) {}
+});
+`;
+
+        Function(`"use strict";\n${parts.join('\n')}\n${footer}`)();
+
+        window[LOADER_STATE_KEY] = {
+            status: 'loaded',
+            loadedAt: Date.now(),
+            baseUrl,
+            hotReload: force,
+        };
+        window[LEGACY_LOADED_KEY] = true;
+        console.debug('[PromptKeeper] All scripts loaded from:', baseUrl);
+        return window.PromptKeeper;
+    }
+
+    if (previousState && previousState.status === 'loaded') {
+        console.info('[PromptKeeper] Loader re-executed; hot-reloading updated plugin files automatically.');
+        loadPromptKeeperRuntime({ force: true }).catch((error) => {
             window[LOADER_STATE_KEY] = {
-                status: 'loaded',
-                loadedAt: Date.now(),
+                status: 'failed',
+                failedAt: Date.now(),
                 baseUrl,
+                error: error && error.message ? error.message : String(error),
             };
-            window[LEGACY_LOADED_KEY] = true;
-            console.debug('[PromptKeeper] All scripts loaded from:', baseUrl);
+            window[LEGACY_LOADED_KEY] = false;
+            console.error('[PromptKeeper]', error);
+        });
+        return;
+    }
+
+    if (previousState && previousState.status === 'loading') {
+        console.debug('[PromptKeeper] Loader skipped: already loading.');
+        return;
+    }
+
+    loadPromptKeeperRuntime()
+        .then(() => {
+            // 状态已在 loadPromptKeeperRuntime 内更新。
         })
         .catch((error) => {
             window[LOADER_STATE_KEY] = {

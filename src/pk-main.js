@@ -1,5 +1,93 @@
 // ========== Main Init ==========
 
+function bindPromptKeeperEvent(eventSource, eventType, handler) {
+    if (!eventSource || !eventType || typeof eventSource.on !== 'function') return;
+    eventSource.on(eventType, handler);
+    promptKeeperEventBindings.push({ eventSource, eventType, handler });
+}
+
+function unbindPromptKeeperEvents() {
+    for (const binding of promptKeeperEventBindings) {
+        const { eventSource, eventType, handler } = binding;
+        try {
+            if (eventSource && typeof eventSource.off === 'function') {
+                eventSource.off(eventType, handler);
+            } else if (eventSource && typeof eventSource.removeListener === 'function') {
+                eventSource.removeListener(eventType, handler);
+            }
+        } catch (error) {
+            console.debug(LOG_PREFIX, `Failed to unbind event ${eventType}:`, error);
+        }
+    }
+    promptKeeperEventBindings = [];
+}
+
+function onPromptKeeperAppReady() {
+    if (promptKeeperAppReadyHandled) return;
+    promptKeeperAppReadyHandled = true;
+    loadSettingsPanel();
+    tryInjectUI();
+    startUIObserver();
+    requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
+    console.log(LOG_PREFIX, 'Plugin v2.1.0 initialized (APP_READY).');
+}
+
+function destroyPromptKeeper(reason = 'manual') {
+    if (autoRestoreTimer) {
+        clearTimeout(autoRestoreTimer);
+        autoRestoreTimer = null;
+    }
+    if (observerThrottleTimer) {
+        clearTimeout(observerThrottleTimer);
+        observerThrottleTimer = null;
+    }
+    if (observerReinjectionResetTimer) {
+        clearTimeout(observerReinjectionResetTimer);
+        observerReinjectionResetTimer = null;
+    }
+    if (observerRafId) {
+        cancelAnimationFrame(observerRafId);
+        observerRafId = null;
+    }
+    if (uiObserver) {
+        uiObserver.disconnect();
+        uiObserver = null;
+    }
+
+    for (const eventType of BUTTON_EVENT_TYPES) {
+        document.removeEventListener(eventType, onPromptKeeperButtonPress, true);
+        document.removeEventListener(eventType, onPromptKeeperButtonPress, false);
+    }
+
+    jQuery(PROMPT_KEEPER_BUTTON_SELECTOR).each(function () {
+        for (const eventType of BUTTON_EVENT_TYPES) {
+            this.removeEventListener(eventType, onPromptKeeperButtonPress, true);
+            this.removeEventListener(eventType, onPromptKeeperButtonPress, false);
+        }
+        this.removeEventListener('keydown', onPromptKeeperButtonKeyDown, false);
+    });
+
+    jQuery(document).off('.promptKeeper');
+    jQuery('#prompt-keeper-settings').remove();
+    jQuery('#prompt-keeper-bar').remove();
+    closeSlotPicker();
+    unbindPromptKeeperEvents();
+
+    lastHandledChatId = null;
+    justSavedChatId = null;
+    observerPaused = false;
+    dragListenersBound = false;
+    promptKeeperButtonDelegationBound = false;
+    promptKeeperEventHandlersBound = false;
+    promptKeeperAppReadyHandled = false;
+    promptKeeperRefreshingUI = false;
+    uiInjectInProgress = false;
+    saveInProgress = false;
+    lastButtonActionById = {};
+
+    console.info(LOG_PREFIX, `Runtime destroyed (${reason}).`);
+}
+
 function _pkInit() {
     if (promptKeeperEventHandlersBound) {
         console.debug(LOG_PREFIX, 'Init skipped: event handlers already bound.');
@@ -26,17 +114,9 @@ function _pkInit() {
 
     promptKeeperEventHandlersBound = true;
 
-    eventSource.on(eventTypes.APP_READY, () => {
-        if (promptKeeperAppReadyHandled) return;
-        promptKeeperAppReadyHandled = true;
-        loadSettingsPanel();
-        tryInjectUI();
-        startUIObserver();
-        requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
-        console.log(LOG_PREFIX, 'Plugin v2.0.3 initialized (APP_READY).');
-    });
+    bindPromptKeeperEvent(eventSource, eventTypes.APP_READY, onPromptKeeperAppReady);
 
-    eventSource.on(eventTypes.CHAT_CHANGED, () => {
+    bindPromptKeeperEvent(eventSource, eventTypes.CHAT_CHANGED, () => {
         if (jQuery('#prompt-keeper-bar').length === 0) {
             tryInjectUI(5, 500);
         }
@@ -44,22 +124,22 @@ function _pkInit() {
     });
 
     if (eventTypes.CHAT_LOADED) {
-        eventSource.on(eventTypes.CHAT_LOADED, onChatLoaded);
+        bindPromptKeeperEvent(eventSource, eventTypes.CHAT_LOADED, onChatLoaded);
     }
 
     if (eventTypes.PRESET_CHANGED) {
-        eventSource.on(eventTypes.PRESET_CHANGED, onPresetChanged);
+        bindPromptKeeperEvent(eventSource, eventTypes.PRESET_CHANGED, onPresetChanged);
     }
 
     if (eventTypes.OAI_PRESET_CHANGED_AFTER) {
-        eventSource.on(eventTypes.OAI_PRESET_CHANGED_AFTER, onPresetChanged);
+        bindPromptKeeperEvent(eventSource, eventTypes.OAI_PRESET_CHANGED_AFTER, onPresetChanged);
     }
 
     if (eventTypes.MAIN_API_CHANGED) {
-        eventSource.on(eventTypes.MAIN_API_CHANGED, onMainApiChanged);
+        bindPromptKeeperEvent(eventSource, eventTypes.MAIN_API_CHANGED, onMainApiChanged);
     }
 
-    console.log(LOG_PREFIX, 'Plugin v2.0.3 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v2.1.0 loaded, waiting for APP_READY...');
 }
 
 _pkInit();

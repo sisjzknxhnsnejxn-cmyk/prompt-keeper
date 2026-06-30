@@ -487,3 +487,22 @@
     height: 16px;
     cursor: pointer;
 }
+
+#prompt-keeper-settings .pk-help-details {
+    margin-top: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, transparent) 70%, transparent);
+}
+
+#prompt-keeper-settings .pk-help-details summary {
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+}
+
+#prompt-keeper-settings .pk-help-content {
+    margin-top: 6px;
+    opacity: 0.9;
+}

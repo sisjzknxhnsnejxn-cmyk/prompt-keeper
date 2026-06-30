@@ -257,11 +257,16 @@ function mergePromptOrder(currentOrder, savedOrder, skipped) {
     for (const savedEntry of savedOrder) {
         if (!savedEntry || typeof savedEntry !== 'object') continue;
         const key = savedEntry.character_id !== undefined ? String(savedEntry.character_id) : '__default__';
-        const currentEntry = currentMap.get(key);
+        let currentEntry = currentMap.get(key);
 
         if (!currentEntry) {
-            console.debug(LOG_PREFIX, `mergePromptOrder: no matching entry for character_id=${key}, skipping.`);
-            continue;
+            currentEntry = findCompatiblePromptOrderEntry(currentOrder, savedEntry);
+            if (currentEntry) {
+                console.debug(LOG_PREFIX, `mergePromptOrder: character_id=${key} not found; using compatible current prompt_order entry.`);
+            } else {
+                console.debug(LOG_PREFIX, `mergePromptOrder: no matching entry for character_id=${key}, skipping.`);
+                continue;
+            }
         }
 
         if (!Array.isArray(savedEntry.order) || !Array.isArray(currentEntry.order)) continue;
@@ -289,6 +294,33 @@ function mergePromptOrder(currentOrder, savedOrder, skipped) {
 
         currentEntry.order = newOrder;
     }
+}
+
+function findCompatiblePromptOrderEntry(currentOrder, savedEntry) {
+    if (!Array.isArray(currentOrder) || !savedEntry || !Array.isArray(savedEntry.order)) return null;
+
+    const savedIdentifiers = new Set(savedEntry.order
+        .map(item => (item && typeof item === 'object') ? item.identifier : item)
+        .filter(Boolean));
+    if (savedIdentifiers.size === 0) return null;
+
+    let bestEntry = null;
+    let bestScore = 0;
+
+    for (const entry of currentOrder) {
+        if (!entry || !Array.isArray(entry.order)) continue;
+        let score = 0;
+        for (const item of entry.order) {
+            const identifier = item && typeof item === 'object' ? item.identifier : item;
+            if (identifier && savedIdentifiers.has(identifier)) score++;
+        }
+        if (score > bestScore) {
+            bestScore = score;
+            bestEntry = entry;
+        }
+    }
+
+    return bestScore > 0 ? bestEntry : null;
 }
 
 /**
@@ -359,4 +391,5 @@ function applyPromptStatesDOM(savedPrompts, skipped) {
 }
 
 // ========== Prompt Manager UI Refresh ==========
+
 

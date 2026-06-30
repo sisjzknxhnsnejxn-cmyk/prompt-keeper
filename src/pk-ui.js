@@ -39,6 +39,17 @@ function formatSlotTime(timestamp) {
     }
 }
 
+function areSlotLabelsSame(a, b) {
+    return normalizePresetKey(String(a || '').replace(/\s+/g, '')) === normalizePresetKey(String(b || '').replace(/\s+/g, ''));
+}
+
+function getSlotMetaLabel(slotName, slot) {
+    const timeLabel = formatSlotTime(slot && slot.savedAt);
+    const presetName = normalizeSlotName((slot && slot.presetName) || slotName);
+    if (!presetName || areSlotLabelsSame(presetName, slotName)) return `保存于 ${timeLabel}`;
+    return `预设：${presetName} · 保存于 ${timeLabel}`;
+}
+
 function closeSlotPicker() {
     jQuery('#prompt-keeper-modal').remove();
 }
@@ -118,10 +129,7 @@ function showSlotPicker(mode) {
     const $list = $modal.find('.pk-modal-list');
     for (const [name, slot] of slotEntries) {
         const isDefault = savedState.defaultSlot === name;
-        const presetName = normalizeSlotName(slot.presetName || name);
-        const presetLabel = normalizePresetKey(presetName) !== normalizePresetKey(name)
-            ? `${presetName} · ${formatSlotTime(slot.savedAt)}`
-            : formatSlotTime(slot.savedAt);
+        const metaLabel = getSlotMetaLabel(name, slot);
         const $item = jQuery(`
             <button type="button" class="pk-slot-item ${isDelete ? 'pk-slot-delete' : ''}">
                 <span class="pk-slot-main">
@@ -132,7 +140,7 @@ function showSlotPicker(mode) {
             </button>
         `);
         $item.find('.pk-slot-name').text(name);
-        $item.find('.pk-slot-time').text(presetLabel);
+        $item.find('.pk-slot-time').text(metaLabel);
         const onSlotPress = async function (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -213,6 +221,11 @@ function bindNativeButtonEvent(button, eventType, useCapture = false) {
     });
 }
 
+function bindKeyboardButtonEvent(button) {
+    button.removeEventListener('keydown', onPromptKeeperButtonKeyDown, false);
+    button.addEventListener('keydown', onPromptKeeperButtonKeyDown, false);
+}
+
 function bindDocumentButtonEvent(eventType) {
     document.removeEventListener(eventType, onPromptKeeperButtonPress, true);
     document.addEventListener(eventType, onPromptKeeperButtonPress, {
@@ -258,6 +271,11 @@ function onPromptKeeperButtonPress(e) {
         e.stopImmediatePropagation();
     }
     handlePromptKeeperButtonAction(`#${button.id}`, jQuery(button));
+}
+
+function onPromptKeeperButtonKeyDown(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    onPromptKeeperButtonPress(e);
 }
 
 function isPromptKeeperMutation(mutations) {
@@ -429,6 +447,7 @@ function bindButtonEvents() {
             button.removeEventListener(eventType, onPromptKeeperButtonPress, true);
             button.removeEventListener(eventType, onPromptKeeperButtonPress, false);
         }
+        button.removeEventListener('keydown', onPromptKeeperButtonKeyDown, false);
 
         $btn.prop('disabled', false)
             .attr('aria-disabled', 'false')
@@ -440,6 +459,7 @@ function bindButtonEvents() {
             bindNativeButtonEvent(button, eventType, true);
             bindNativeButtonEvent(button, eventType, false);
         }
+        bindKeyboardButtonEvent(button);
     }
 
     console.debug(LOG_PREFIX, 'Button events bound with Edge/ST 1.16 compatible native handlers.');
@@ -581,9 +601,5 @@ function tryInjectUI(maxRetries = 15, interval = 1000) {
     };
     tryInject();
 }
-
-
-
-
 
 
