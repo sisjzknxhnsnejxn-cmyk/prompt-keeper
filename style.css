@@ -385,7 +385,7 @@
 
     .prompt-keeper-btn-group .menu_button {
         min-height: 46px;
-        padding: 8px 7px;
+        padding: 8px 12px;
         gap: 5px;
         font-size: 15px;
         border-radius: 12px;
@@ -454,7 +454,7 @@
 @media (max-width: 360px) {
     .prompt-keeper-btn-group .menu_button {
         gap: 4px;
-        padding-inline: 5px;
+        padding-inline: 10px;
         font-size: 14px;
     }
 }
