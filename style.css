@@ -14,8 +14,9 @@
     position: relative;
     z-index: 5;
     box-sizing: border-box;
+    contain: layout paint;
     pointer-events: auto;
-    transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.16s ease, background-color 0.16s ease;
 }
 
 .prompt-keeper-header {
@@ -58,6 +59,7 @@
     line-height: 1.2;
     min-width: 0;
     min-height: 40px;
+    border-radius: 8px;
     box-sizing: border-box;
     position: relative;
     z-index: 1;
@@ -68,19 +70,19 @@
     appearance: none;
     -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
     touch-action: manipulation;
+    -webkit-touch-callout: none;
     user-select: none;
     -webkit-user-select: none;
     /* Explicit color fallback to prevent grey/disabled appearance on iOS */
     color: var(--SmartThemeBodyColor, #ccc);
     opacity: 1;
-    transform: translateY(0) scale(1);
-    transition: transform 0.16s ease, opacity 0.16s ease, background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    font-weight: 600;
+    transition: opacity 0.12s ease, background-color 0.14s ease, border-color 0.14s ease;
 }
 
 .prompt-keeper-btn-group .menu_button:hover {
-    transform: translateY(-1px);
+    background-color: rgba(127, 127, 127, 0.16);
     background-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8ab4ff) 16%, transparent);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
 }
 
 .prompt-keeper-btn-group .menu_button:focus-visible {
@@ -103,7 +105,6 @@
 .prompt-keeper-btn-group .menu_button:active,
 .prompt-keeper-btn-group .menu_button.pk-btn-active {
     opacity: 0.82;
-    transform: translateY(1px) scale(0.97);
     background-color: var(--SmartThemeQuoteColor, rgba(168, 200, 255, 0.2));
 }
 
@@ -135,9 +136,11 @@
     min-height: 100vh;
     min-height: 100dvh;
     min-height: 100svh;
+    overflow-y: auto;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     background: rgba(0, 0, 0, 0.55);
     touch-action: manipulation;
+    -webkit-touch-callout: none;
     box-sizing: border-box;
     animation: pk-modal-fade-in 0.16s ease-out;
 }
@@ -145,6 +148,7 @@
 #prompt-keeper-modal .pk-modal-card {
     width: min(420px, calc(100vw - 32px));
     max-width: 100%;
+    max-height: min(72vh, 560px);
     max-height: min(72dvh, 560px);
     max-height: min(72svh, 560px);
     display: flex;
@@ -193,10 +197,10 @@
     border: 0;
     cursor: pointer;
     touch-action: manipulation;
+    -webkit-touch-callout: none;
     user-select: none;
     -webkit-user-select: none;
-    transform: translateY(0) scale(1);
-    transition: transform 0.16s ease, opacity 0.16s ease, background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    transition: opacity 0.12s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
 .pk-modal-theme {
@@ -213,8 +217,7 @@
 .pk-modal-theme:hover,
 .pk-modal-cancel:hover,
 .pk-slot-item:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
+    background-color: rgba(127, 127, 127, 0.22);
 }
 
 .pk-modal-theme:focus-visible,
@@ -248,6 +251,7 @@
     color: inherit;
     text-align: left;
     box-sizing: border-box;
+    contain: content;
 }
 
 .pk-slot-item:active,
@@ -346,59 +350,116 @@
 @media (max-width: 480px) {
     .prompt-keeper-bar {
         gap: 8px;
-        padding: 10px;
-        border-radius: 10px;
+        padding: 10px 12px;
+        margin: 10px 0;
+        border-radius: 14px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
     }
 
     .prompt-keeper-header {
-        gap: 6px;
-        font-size: 0.92em;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 7px;
+        font-size: 0.95em;
+    }
+
+    .prompt-keeper-header i {
+        align-self: center;
     }
 
     .pk-saved,
     .pk-not-saved {
-        flex: 1 0 100%;
+        grid-column: 1 / -1;
         margin-left: 0;
         white-space: normal;
+        font-size: 0.86em;
+        line-height: 1.35;
+        padding-top: 1px;
     }
 
     .prompt-keeper-btn-group {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
     }
 
+    .prompt-keeper-btn-group #prompt-keeper-restore {
+        grid-column: 1 / -1;
+        order: -1;
+    }
+
     .prompt-keeper-btn-group .menu_button {
-        min-height: 44px;
-        padding: 7px 6px;
-        gap: 3px;
-        font-size: 0.82em;
+        min-height: 48px;
+        padding: 9px 10px;
+        gap: 6px;
+        font-size: 16px;
+        border-radius: 12px;
+        line-height: 1.15;
+    }
+
+    .prompt-keeper-btn-group .menu_button span {
+        white-space: normal;
     }
 
     #prompt-keeper-modal.pk-modal-overlay {
-        align-items: center;
+        align-items: flex-end;
         justify-content: center;
-        padding: max(18px, calc(env(safe-area-inset-top) + 12px)) max(12px, env(safe-area-inset-right)) max(18px, calc(env(safe-area-inset-bottom) + 12px)) max(12px, env(safe-area-inset-left));
+        padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, calc(env(safe-area-inset-bottom) + 8px)) max(10px, env(safe-area-inset-left));
+        background: rgba(0, 0, 0, 0.5);
     }
 
     #prompt-keeper-modal .pk-modal-card {
         width: 100%;
-        max-height: calc(100dvh - max(36px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)));
-        max-height: calc(100svh - max(36px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)));
-        border-radius: 18px;
-        padding: 14px;
+        max-height: calc(88vh - max(0px, env(safe-area-inset-bottom)));
+        max-height: calc(88dvh - max(0px, env(safe-area-inset-bottom)));
+        max-height: calc(88svh - max(0px, env(safe-area-inset-bottom)));
+        border-radius: 22px 22px 16px 16px;
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .pk-modal-header {
+        gap: 10px;
+    }
+
+    .pk-modal-header strong {
+        font-size: 1.05em;
     }
 
     .pk-modal-theme {
-        padding-inline: 9px;
-        font-size: 0.82em;
+        min-height: 40px;
+        padding: 8px 11px;
+        font-size: 0.9em;
+    }
+
+    .pk-modal-list {
+        gap: 10px;
+        padding-right: 0;
+    }
+
+    .pk-slot-item {
+        min-height: 52px;
+        padding: 12px 13px;
+        border-radius: 14px;
+        font-size: 16px;
+    }
+
+    .pk-slot-time {
+        font-size: 0.86em;
+    }
+
+    .pk-modal-cancel {
+        min-height: 48px;
+        border-radius: 14px;
+        font-size: 16px;
     }
 }
 
 @media (max-width: 360px) {
     .prompt-keeper-btn-group .menu_button {
         flex-direction: column;
-        font-size: 0.78em;
+        gap: 4px;
+        padding-inline: 8px;
     }
 }
 
@@ -437,6 +498,7 @@
     }
 
     #prompt-keeper-modal .pk-modal-card {
+        max-height: calc(100vh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
         max-height: calc(100dvh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
         max-height: calc(100svh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
     }
@@ -493,6 +555,7 @@
     padding: 6px 8px;
     border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
     border-radius: 8px;
+    background: rgba(127, 127, 127, 0.08);
     background: color-mix(in srgb, var(--SmartThemeBlurTintColor, transparent) 70%, transparent);
 }
 

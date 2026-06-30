@@ -219,8 +219,9 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
         return false;
     }
 
+    let uiStable = true;
     try {
-        await tryRefreshPromptManagerUI();
+        uiStable = await refreshPromptManagerUIUntilStable(targetSlot, chatIdAtStart);
     } finally {
         promptKeeperRefreshingUI = false;
     }
@@ -234,6 +235,12 @@ async function restoreStatesFromMetadata(silent = false, slotName = null, option
         const msg = `已跳过缺失条目`;
         console.warn(LOG_PREFIX, msg);
         if (!silent) toastr.warning(msg, '恢复提醒', { timeOut: 8000 });
+    }
+
+    if (!uiStable) {
+        const msg = '底层状态已恢复，但界面可能尚未完全刷新；请展开预设管理器或切换面板后查看。';
+        console.warn(LOG_PREFIX, msg);
+        if (!silent) toastr.info(msg, 'Prompt Keeper', { timeOut: 7000 });
     }
 
     const presetInfo = presetSwitched ? '，已切预设' : '';
@@ -399,6 +406,7 @@ function onMainApiChanged() {
 }
 
 // ========== UI ==========
+
 
 
 

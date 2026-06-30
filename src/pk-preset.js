@@ -19,41 +19,10 @@ async function tryRefreshPromptManagerUI() {
         // 表现为刷新正则或预设 UI 时本插件又被重复刷新。这里仅使用本插件内部兜底同步。
 
         await new Promise(resolve => setTimeout(resolve, 100));
-        const oaiSettings = ctx.chatCompletionSettings;
-        if (oaiSettings && Array.isArray(oaiSettings.prompt_order)) {
-            const enabledMap = {};
-            for (const entry of oaiSettings.prompt_order) {
-                if (Array.isArray(entry.order)) {
-                    for (const item of entry.order) {
-                        if (item.identifier) {
-                            enabledMap[item.identifier] = item.enabled !== false;
-                        }
-                    }
-                }
-            }
-
-            const $container = jQuery(
-                '#completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
-            ).first();
-            if ($container.length > 0) {
-                let synced = 0;
-                $container.find('[data-pm-identifier], [data-prompt-id]').each(function () {
-                    const $row = jQuery(this);
-                    const identifier = $row.attr('data-pm-identifier') || $row.attr('data-prompt-id');
-                    if (!identifier || enabledMap[identifier] === undefined) return;
-
-                    const $checkbox = $row.find('input[type="checkbox"]').first();
-                    if ($checkbox.length > 0 && $checkbox.prop('checked') !== enabledMap[identifier]) {
-                        // 这里只同步显示层，不触发 change，避免 Prompt Manager 用旧 DOM 事件链反向覆盖刚恢复的底层状态。
-                        $checkbox.prop('checked', enabledMap[identifier]);
-                        synced++;
-                    }
-                });
-                if (synced > 0) {
-                    console.debug(LOG_PREFIX, `UI refresh: synced ${synced} checkbox(es) via DOM fallback`);
-                    return;
-                }
-            }
+        const synced = syncPromptManagerCheckboxesFromSettings();
+        if (synced > 0) {
+            console.debug(LOG_PREFIX, `UI refresh: synced ${synced} checkbox(es) via DOM fallback`);
+            return;
         }
 
         const $pmContainer = jQuery(
@@ -66,6 +35,59 @@ async function tryRefreshPromptManagerUI() {
     } catch (e) {
         console.debug(LOG_PREFIX, 'tryRefreshPromptManagerUI: non-critical error', e);
     }
+}
+
+function syncPromptManagerCheckboxesFromSettings() {
+    const ctx = getCtx();
+    const oaiSettings = ctx.chatCompletionSettings;
+    if (!oaiSettings || !Array.isArray(oaiSettings.prompt_order)) return 0;
+
+    const enabledMap = {};
+    for (const entry of oaiSettings.prompt_order) {
+        if (!Array.isArray(entry.order)) continue;
+        for (const item of entry.order) {
+            if (item && item.identifier) {
+                enabledMap[item.identifier] = item.enabled !== false;
+            }
+        }
+    }
+
+    const $container = jQuery(
+        '#completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
+    ).first();
+    if ($container.length === 0) return 0;
+
+    let synced = 0;
+    $container.find('[data-pm-identifier], [data-prompt-id]').each(function () {
+        const $row = jQuery(this);
+        const identifier = $row.attr('data-pm-identifier') || $row.attr('data-prompt-id');
+        if (!identifier || enabledMap[identifier] === undefined) return;
+
+        const $checkbox = $row.find('input[type="checkbox"]').first();
+        if ($checkbox.length > 0 && $checkbox.prop('checked') !== enabledMap[identifier]) {
+            // 这里只同步显示层，不触发 change，避免 Prompt Manager 用旧 DOM 事件链反向覆盖刚恢复的底层状态。
+            $checkbox.prop('checked', enabledMap[identifier]);
+            synced++;
+        }
+    });
+
+    return synced;
+}
+
+async function refreshPromptManagerUIUntilStable(savedState, chatIdAtStart, delays = [0, 150, 450, 900]) {
+    for (const delay of delays) {
+        if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+        if (chatIdAtStart && getCtx().chatId !== chatIdAtStart) return false;
+
+        await tryRefreshPromptManagerUI();
+        syncPromptManagerCheckboxesFromSettings();
+
+        const mismatches = findSavedPromptStateMismatches(savedState);
+        if (mismatches.length === 0) return true;
+        console.debug(LOG_PREFIX, `UI/state stabilization pass still has ${mismatches.length} mismatch(es).`, mismatches);
+    }
+
+    return findSavedPromptStateMismatches(savedState).length === 0;
 }
 
 // ========== Preset ==========
@@ -135,7 +157,7 @@ async function switchToPreset(presetName) {
     if (!presetName) return false;
 
     const currentPreset = getCurrentPresetName();
-    if (currentPreset === presetName) {
+    if (isPresetNameMatch(currentPreset, presetName)) {
         console.debug(LOG_PREFIX, `Already on preset "${presetName}", no switch needed.`);
         return true;
     }
@@ -198,9 +220,11 @@ async function switchToPreset(presetName) {
             }
 
             if (matched) {
-                await waitForPresetSwitch(presetName);
-                console.log(LOG_PREFIX, `Switched preset to "${presetName}" via DOM selector.`);
-                return true;
+                if (await waitForPresetSwitch(presetName)) {
+                    console.log(LOG_PREFIX, `Switched preset to "${presetName}" via DOM selector.`);
+                    return true;
+                }
+                console.warn(LOG_PREFIX, `DOM selector matched preset "${presetName}" but active preset did not change successfully.`);
             } else {
                 console.warn(LOG_PREFIX, `Preset "${presetName}" not found in selector options. It may have been renamed or deleted.`);
             }
@@ -230,6 +254,7 @@ async function switchToPreset(presetName) {
 }
 
 // ========== Core: Save / Restore / Delete ==========
+
 
 
 

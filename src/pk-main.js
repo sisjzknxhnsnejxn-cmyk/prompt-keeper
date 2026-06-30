@@ -25,9 +25,8 @@ function unbindPromptKeeperEvents() {
 function onPromptKeeperAppReady() {
     if (promptKeeperAppReadyHandled) return;
     promptKeeperAppReadyHandled = true;
-    loadSettingsPanel();
-    tryInjectUI();
-    startUIObserver();
+    ensurePromptKeeperUI('app_ready');
+    schedulePromptKeeperUIEnsure('app_ready');
     requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
     console.log(LOG_PREFIX, 'Plugin v2.1.0 initialized (APP_READY).');
 }
@@ -45,6 +44,15 @@ function destroyPromptKeeper(reason = 'manual') {
         clearTimeout(observerReinjectionResetTimer);
         observerReinjectionResetTimer = null;
     }
+    if (migratedStatePersistTimer) {
+        clearTimeout(migratedStatePersistTimer);
+        migratedStatePersistTimer = null;
+    }
+    if (migratedStatePersistIdleId) {
+        pkCancelIdleTask(migratedStatePersistIdleId);
+        migratedStatePersistIdleId = null;
+    }
+    clearPromptKeeperUIEnsureTimers();
     if (observerRafId) {
         cancelAnimationFrame(observerRafId);
         observerRafId = null;
@@ -54,13 +62,13 @@ function destroyPromptKeeper(reason = 'manual') {
         uiObserver = null;
     }
 
-    for (const eventType of BUTTON_EVENT_TYPES) {
+    for (const eventType of ['pointerup', 'touchend', 'click']) {
         document.removeEventListener(eventType, onPromptKeeperButtonPress, true);
         document.removeEventListener(eventType, onPromptKeeperButtonPress, false);
     }
 
     jQuery(PROMPT_KEEPER_BUTTON_SELECTOR).each(function () {
-        for (const eventType of BUTTON_EVENT_TYPES) {
+        for (const eventType of ['pointerup', 'touchend', 'click']) {
             this.removeEventListener(eventType, onPromptKeeperButtonPress, true);
             this.removeEventListener(eventType, onPromptKeeperButtonPress, false);
         }
@@ -78,6 +86,7 @@ function destroyPromptKeeper(reason = 'manual') {
     observerPaused = false;
     dragListenersBound = false;
     promptKeeperButtonDelegationBound = false;
+    promptKeeperButtonDelegatedEvents = '';
     promptKeeperEventHandlersBound = false;
     promptKeeperAppReadyHandled = false;
     promptKeeperRefreshingUI = false;
@@ -117,14 +126,15 @@ function _pkInit() {
     bindPromptKeeperEvent(eventSource, eventTypes.APP_READY, onPromptKeeperAppReady);
 
     bindPromptKeeperEvent(eventSource, eventTypes.CHAT_CHANGED, () => {
-        if (jQuery('#prompt-keeper-bar').length === 0) {
-            tryInjectUI(5, 500);
-        }
+        schedulePromptKeeperUIEnsure('chat_changed');
         onChatChanged();
     });
 
     if (eventTypes.CHAT_LOADED) {
-        bindPromptKeeperEvent(eventSource, eventTypes.CHAT_LOADED, onChatLoaded);
+        bindPromptKeeperEvent(eventSource, eventTypes.CHAT_LOADED, () => {
+            schedulePromptKeeperUIEnsure('chat_loaded');
+            onChatLoaded();
+        });
     }
 
     if (eventTypes.PRESET_CHANGED) {

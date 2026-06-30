@@ -138,7 +138,7 @@ function getSavedStateFromCurrentChat() {
     const chatMetadata = ctx.chatMetadata;
     const rawState = chatMetadata && chatMetadata[METADATA_KEY];
     const savedState = migrateState(rawState);
-    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState);
+    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState, { deferred: true });
     return { chatMetadata, rawState, savedState };
 }
 
@@ -160,11 +160,27 @@ async function waitForChatContext(chatId, timeoutMs = AUTO_RESTORE_CONTEXT_TIMEO
     return false;
 }
 
-function persistMigratedStateIfNeeded(chatMetadata, rawState, migratedState) {
+function persistMigratedStateIfNeeded(chatMetadata, rawState, migratedState, options = {}) {
     if (!chatMetadata || !rawState || !migratedState || migratedState.__futureVersion) return;
     if (rawState.version === METADATA_VERSION && rawState.slots) return;
     chatMetadata[METADATA_KEY] = migratedState;
-    persistChatMetadata();
+
+    const persist = () => {
+        migratedStatePersistTimer = null;
+        migratedStatePersistIdleId = null;
+        persistChatMetadata();
+    };
+
+    if (options.deferred === true) {
+        if (migratedStatePersistTimer || migratedStatePersistIdleId) return;
+        migratedStatePersistTimer = setTimeout(() => {
+            migratedStatePersistTimer = null;
+            migratedStatePersistIdleId = pkScheduleIdleTask(persist, 2000);
+        }, 1800);
+        return;
+    }
+
+    persist();
 }
 
 // ========== Prompt State Read/Write ==========

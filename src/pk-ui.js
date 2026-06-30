@@ -63,6 +63,24 @@ function shouldHandleInteraction(element) {
     return true;
 }
 
+function suppressSyntheticClickAfterTouch(element) {
+    if (!element) return;
+    element.dataset.pkSuppressClickUntil = String(Date.now() + INTERACTION_DEBOUNCE_MS);
+}
+
+function shouldSuppressSyntheticClick(element, eventType) {
+    if (!element || eventType !== 'click') return false;
+    const suppressUntil = Number(element.dataset.pkSuppressClickUntil || 0);
+    return suppressUntil > Date.now();
+}
+
+function markTouchHandledForSyntheticClick(element, eventType) {
+    if (!element) return;
+    if (eventType === 'touchend' || eventType === 'pointerup') {
+        suppressSyntheticClickAfterTouch(element);
+    }
+}
+
 function toggleSlotPickerTheme() {
     const $modal = jQuery('#prompt-keeper-modal');
     if ($modal.length === 0) return;
@@ -88,8 +106,8 @@ function applySlotPickerTheme($modal, theme) {
 
 function animatePressedButton($btn) {
     if (!$btn || !$btn.length) return;
-    $btn.removeClass('pk-btn-active');
-    void $btn[0].offsetWidth;
+    // 避免 offsetWidth 强制同步布局；PC 端预设面板频繁 hover 时这类强制 reflow
+    // 会明显放大卡顿。直接切 class 即可提供轻量反馈。
     $btn.addClass('pk-btn-active');
     setTimeout(() => $btn.removeClass('pk-btn-active'), 220);
 }
@@ -99,7 +117,7 @@ function showSlotPicker(mode) {
     const chatMetadata = ctx.chatMetadata;
     const rawState = chatMetadata && chatMetadata[METADATA_KEY];
     const savedState = migrateState(rawState);
-    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState);
+    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState, { deferred: true });
     const slotEntries = getSlotEntries(savedState);
 
     if (slotEntries.length === 0) {
@@ -127,6 +145,7 @@ function showSlotPicker(mode) {
     `);
 
     const $list = $modal.find('.pk-modal-list');
+    const modalEventTypes = pkGetButtonEventTypes();
     for (const [name, slot] of slotEntries) {
         const isDefault = savedState.defaultSlot === name;
         const metaLabel = getSlotMetaLabel(name, slot);
@@ -144,7 +163,9 @@ function showSlotPicker(mode) {
         const onSlotPress = async function (e) {
             e.preventDefault();
             e.stopPropagation();
+            if (shouldSuppressSyntheticClick($item[0], e.type)) return;
             if (!shouldHandleInteraction($item[0]) || $item.prop('disabled')) return;
+            markTouchHandledForSyntheticClick($item[0], e.type);
 
             animatePressedButton($item);
             $item.addClass('pk-slot-selected pk-slot-working').prop('disabled', true);
@@ -164,7 +185,7 @@ function showSlotPicker(mode) {
             }
             closeSlotPicker();
         };
-        for (const eventType of BUTTON_EVENT_TYPES) {
+        for (const eventType of modalEventTypes) {
             $item[0].addEventListener(eventType, onSlotPress, { passive: false });
         }
         $list.append($item);
@@ -176,19 +197,23 @@ function showSlotPicker(mode) {
     const onThemePress = function (e) {
         e.preventDefault();
         e.stopPropagation();
+        if (shouldSuppressSyntheticClick(themeButton, e.type)) return;
         if (!shouldHandleInteraction(themeButton)) return;
+        markTouchHandledForSyntheticClick(themeButton, e.type);
         animatePressedButton(jQuery(themeButton));
         toggleSlotPickerTheme();
     };
     const onCancelPress = function (e) {
         e.preventDefault();
         e.stopPropagation();
+        if (shouldSuppressSyntheticClick(cancelButton, e.type)) return;
         if (!shouldHandleInteraction(cancelButton)) return;
+        markTouchHandledForSyntheticClick(cancelButton, e.type);
         animatePressedButton(jQuery(cancelButton));
         closeSlotPicker();
     };
 
-    for (const eventType of BUTTON_EVENT_TYPES) {
+    for (const eventType of modalEventTypes) {
         themeButton.addEventListener(eventType, onThemePress, { passive: false });
         cancelButton.addEventListener(eventType, onCancelPress, { passive: false });
     }
@@ -235,30 +260,47 @@ function bindDocumentButtonEvent(eventType) {
 }
 
 function bindDelegatedButtonEvents() {
-    if (promptKeeperButtonDelegationBound) return;
+    const eventTypes = pkGetButtonEventTypes();
+    const signature = eventTypes.join(',');
+    if (promptKeeperButtonDelegationBound && promptKeeperButtonDelegatedEvents === signature) return;
 
-    for (const eventType of BUTTON_EVENT_TYPES) {
+    for (const eventType of ALL_BUTTON_EVENT_TYPES) {
+        document.removeEventListener(eventType, onPromptKeeperButtonPress, true);
+    }
+
+    for (const eventType of eventTypes) {
         bindDocumentButtonEvent(eventType);
     }
 
     promptKeeperButtonDelegationBound = true;
+    promptKeeperButtonDelegatedEvents = signature;
     console.debug(LOG_PREFIX, 'Document-level delegated button events bound.');
+}
+
+function isPromptKeeperActionButton(button) {
+    return Boolean(
+        button &&
+        ['prompt-keeper-save', 'prompt-keeper-restore', 'prompt-keeper-delete'].includes(button.id) &&
+        button.closest &&
+        button.closest('#prompt-keeper-bar')
+    );
 }
 
 function getPromptKeeperButtonFromEvent(e) {
     const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
     for (const target of path) {
-        if (target && target.id && ['prompt-keeper-save', 'prompt-keeper-restore', 'prompt-keeper-delete'].includes(target.id)) {
+        if (isPromptKeeperActionButton(target)) {
             return target;
         }
         if (target && target.closest) {
             const button = target.closest(PROMPT_KEEPER_BUTTON_SELECTOR);
-            if (button) return button;
+            if (isPromptKeeperActionButton(button)) return button;
         }
     }
-    return e.target && e.target.closest
+    const button = e.target && e.target.closest
         ? e.target.closest(PROMPT_KEEPER_BUTTON_SELECTOR)
         : null;
+    return isPromptKeeperActionButton(button) ? button : null;
 }
 
 function onPromptKeeperButtonPress(e) {
@@ -270,6 +312,8 @@ function onPromptKeeperButtonPress(e) {
     if (typeof e.stopImmediatePropagation === 'function') {
         e.stopImmediatePropagation();
     }
+    if (shouldSuppressSyntheticClick(button, e.type)) return;
+    markTouchHandledForSyntheticClick(button, e.type);
     handlePromptKeeperButtonAction(`#${button.id}`, jQuery(button));
 }
 
@@ -298,28 +342,76 @@ function resumeUIObserver() {
     console.debug(LOG_PREFIX, 'UI Observer resumed (drag ended).');
     if (!document.getElementById('prompt-keeper-bar')) {
         console.debug(LOG_PREFIX, 'Bar missing after drag, re-injecting.');
-        injectUI();
+        ensurePromptKeeperUI('drag_resume');
     }
+}
+
+function clearPromptKeeperUIEnsureTimers() {
+    for (const timer of uiEnsureTimers) {
+        clearTimeout(timer);
+    }
+    uiEnsureTimers = [];
+}
+
+function schedulePromptKeeperUIEnsure(source = 'scheduled', delays = UI_ENSURE_DELAYS_MS) {
+    clearPromptKeeperUIEnsureTimers();
+
+    for (const delay of delays) {
+        const timer = setTimeout(() => {
+            uiEnsureTimers = uiEnsureTimers.filter(item => item !== timer);
+            ensurePromptKeeperUI(`${source}:${delay}ms`);
+        }, delay);
+        uiEnsureTimers.push(timer);
+    }
+}
+
+function ensurePromptKeeperUI(source = 'manual') {
+    try {
+        if (document.getElementById('extensions_settings2') && !document.getElementById('prompt-keeper-settings')) {
+            loadSettingsPanel();
+        }
+    } catch (error) {
+        console.debug(LOG_PREFIX, `Settings panel ensure skipped (${source}):`, error);
+    }
+
+    if (document.getElementById('prompt-keeper-bar')) {
+        bindButtonEvents();
+        if (!uiObserver) {
+            startUIObserver();
+        }
+        requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
+        return;
+    }
+
+    tryInjectUI(3, 300);
+}
+
+function getPersistentUIObserveTarget() {
+    return document.getElementById('ai_response_configuration') ||
+        document.getElementById('openai_settings') ||
+        document.getElementById('extensions_settings2') ||
+        document.getElementById('rm_api_block') ||
+        document.body;
 }
 
 function bindDragPauseListeners() {
     if (dragListenersBound) return;
     dragListenersBound = true;
 
-    jQuery(document).on('mousedown touchstart', '[data-pm-identifier] .drag-handle, [data-pm-identifier].ui-sortable-handle, .prompt_manager_prompt .drag-handle, .prompt-manager-detach-action-menu', function () {
+    jQuery(document).on('mousedown.promptKeeper touchstart.promptKeeper', '[data-pm-identifier] .drag-handle, [data-pm-identifier].ui-sortable-handle, .prompt_manager_prompt .drag-handle, .prompt-manager-detach-action-menu', function () {
         pauseUIObserver();
     });
 
-    jQuery(document).on('mouseup touchend', function () {
+    jQuery(document).on('mouseup.promptKeeper touchend.promptKeeper', function () {
         if (observerPaused) {
             setTimeout(resumeUIObserver, 300);
         }
     });
 
-    jQuery(document).on('sortstart', function () {
+    jQuery(document).on('sortstart.promptKeeper', function () {
         pauseUIObserver();
     });
-    jQuery(document).on('sortstop sortupdate', function () {
+    jQuery(document).on('sortstop.promptKeeper sortupdate.promptKeeper', function () {
         setTimeout(resumeUIObserver, 300);
     });
 
@@ -332,32 +424,16 @@ function startUIObserver() {
         uiObserver = null;
     }
 
-    if (jQuery('#prompt-keeper-bar').length === 0) return;
-
     bindDragPauseListeners();
 
-    const barElement = document.getElementById('prompt-keeper-bar');
-    const barParent = barElement ? barElement.parentNode : null;
-
-    // 优先监听 bar 的直接父节点（范围最小），否则退回外层持久容器
-    let observeTarget = null;
-    let useSubtree = false;
-
-    if (barParent && barParent !== document.body) {
-        observeTarget = barParent;
-        useSubtree = false;
-    } else {
-        observeTarget =
-            document.getElementById('ai_response_configuration') ||
-            document.getElementById('openai_settings') ||
-            document.getElementById('rm_api_block') ||
-            document.body;
-        useSubtree = true;
-    }
+    // SillyTavern 1.18.0 进入/切换聊天时会替换设置面板局部 DOM。
+    // 监听 bar 的直接父节点容易挂到已被移除的旧节点上，因此改为监听更持久的外层容器。
+    const observeTarget = getPersistentUIObserveTarget();
+    const useSubtree = true;
 
     uiObserver = new MutationObserver((mutations) => {
         if (observerPaused) return;
-        if (isPromptKeeperMutation(mutations)) return;
+        if (isPromptKeeperMutation(mutations) && document.getElementById('prompt-keeper-bar')) return;
         if (observerRafId) return;
 
         observerRafId = requestAnimationFrame(() => {
@@ -385,13 +461,13 @@ function startUIObserver() {
                             console.debug(LOG_PREFIX, 'Observer re-injection counter reset.');
                             if (!document.getElementById('prompt-keeper-bar')) {
                                 console.debug(LOG_PREFIX, 'Bar still missing after counter reset, attempting re-injection.');
-                                injectUI();
+                                ensurePromptKeeperUI('observer_reset');
                             }
                         }, OBSERVER_REINJECTION_WINDOW);
                     }
 
                     console.debug(LOG_PREFIX, `UI bar was removed from DOM, re-injecting... (${observerReinjectionCount}/${OBSERVER_REINJECTION_LIMIT})`);
-                    injectUI();
+                    ensurePromptKeeperUI('observer');
                 }
             }, UI_REINJECT_SETTLE_MS);
         });
@@ -428,11 +504,15 @@ function executeButtonAction(action, $btn, buttonId = 'unknown') {
 
 /**
  * 直接绑定按钮事件（非事件委托）。
- * 同时绑定 click 和 touchend，iOS Safari 上 touchend 更可靠。
- * 防重复触发通过 BUTTON_DEBOUNCE_MS 时间窗口控制。
+ * 同时绑定 pointerup、touchend 和 click：
+ * - iOS Safari / WebView 上 touchend 与 click 更可靠。
+ * - PC 与 Android Chrome 上 pointerup/click 可作为互相兜底。
+ * 防重复触发通过 BUTTON_DEBOUNCE_MS 与合成 click 抑制共同控制。
  */
 function bindButtonEvents() {
     const selectors = ['#prompt-keeper-save', '#prompt-keeper-restore', '#prompt-keeper-delete'];
+    const eventTypes = pkGetButtonEventTypes();
+    const eventSignature = eventTypes.join(',');
 
     bindDelegatedButtonEvents();
 
@@ -441,25 +521,30 @@ function bindButtonEvents() {
         if ($btn.length === 0) continue;
         const button = $btn[0];
 
-        // 移除可能的旧绑定，防止 Edge/ST 1.16 中 capture + delegated + direct 多路径互相拦截。
-        $btn.off('.pk');
-        for (const eventType of BUTTON_EVENT_TYPES) {
-            button.removeEventListener(eventType, onPromptKeeperButtonPress, true);
-            button.removeEventListener(eventType, onPromptKeeperButtonPress, false);
-        }
-        button.removeEventListener('keydown', onPromptKeeperButtonKeyDown, false);
-
         $btn.prop('disabled', false)
             .attr('aria-disabled', 'false')
             .attr('data-pk-action', selector.replace('#prompt-keeper-', ''))
             .removeClass('disabled interactable_disabled');
-        for (const eventType of BUTTON_EVENT_TYPES) {
-            // Edge + SillyTavern 1.16 有时会在冒泡阶段吞掉 menu_button 的 click，
-            // 所以同时绑定原生 capture 与 bubble；executeButtonAction 会统一去重。
-            bindNativeButtonEvent(button, eventType, true);
-            bindNativeButtonEvent(button, eventType, false);
+
+        if (button.dataset.pkBoundEvents !== eventSignature) {
+            // 移除可能的旧绑定，防止热重载或设备事件策略变化后重复兜底。
+            $btn.off('.pk');
+            for (const eventType of ALL_BUTTON_EVENT_TYPES) {
+                button.removeEventListener(eventType, onPromptKeeperButtonPress, true);
+                button.removeEventListener(eventType, onPromptKeeperButtonPress, false);
+            }
+            button.removeEventListener('keydown', onPromptKeeperButtonKeyDown, false);
+
+            for (const eventType of eventTypes) {
+                // PC 端现在只有 click；触屏设备保留 capture/bubble + 多事件兜底。
+                bindNativeButtonEvent(button, eventType, true);
+                if (eventTypes.length > 1) {
+                    bindNativeButtonEvent(button, eventType, false);
+                }
+            }
+            bindKeyboardButtonEvent(button);
+            button.dataset.pkBoundEvents = eventSignature;
         }
-        bindKeyboardButtonEvent(button);
     }
 
     console.debug(LOG_PREFIX, 'Button events bound with Edge/ST 1.16 compatible native handlers.');
@@ -468,6 +553,9 @@ function bindButtonEvents() {
 function injectUI() {
     if (jQuery('#prompt-keeper-bar').length > 0) {
         bindButtonEvents();
+        if (!uiObserver) {
+            startUIObserver();
+        }
         requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
         console.debug(LOG_PREFIX, 'UI already exists; button events rebound.');
         return;
@@ -576,12 +664,16 @@ function injectUI() {
 
     lastUIInjectAt = Date.now();
     uiInjectInProgress = false;
+    startUIObserver();
     console.log(LOG_PREFIX, 'UI injected successfully.');
 }
 
 function tryInjectUI(maxRetries = 15, interval = 1000) {
     if (jQuery('#prompt-keeper-bar').length > 0) {
         bindButtonEvents();
+        if (!uiObserver) {
+            startUIObserver();
+        }
         return;
     }
     if (uiInjectInProgress) return;
@@ -601,5 +693,3 @@ function tryInjectUI(maxRetries = 15, interval = 1000) {
     };
     tryInject();
 }
-
-

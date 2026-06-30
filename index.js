@@ -25,6 +25,7 @@
     };
 
     const scriptNames = [
+        'pk-performance.js',
         'pk-constants.js',
         'pk-settings.js',
         'pk-state.js',

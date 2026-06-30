@@ -153,7 +153,7 @@ function checkDirtyState(savedState, options = {}) {
 
     if (allowPresetSwitch && savedState.presetName) {
         const currentPreset = getCurrentPresetName();
-        if (currentPreset && currentPreset.trim() !== savedState.presetName.trim()) {
+        if (currentPreset && !isPresetNameMatch(currentPreset, savedState.presetName)) {
             result.needsPresetSwitch = true;
             result.targetPreset = savedState.presetName;
         }
@@ -297,6 +297,21 @@ function findPromptEnabledMismatches(oaiSettings, savedPrompts, currentIdentifie
     }
 
     return [...new Set(mismatched)];
+}
+
+function findSavedPromptStateMismatches(savedState) {
+    if (!savedState || !savedState.prompts) return [];
+    const currentStates = readPromptStates();
+    if (!currentStates || !currentStates.prompts) return Object.keys(savedState.prompts);
+
+    const mismatches = [];
+    for (const [identifier, enabled] of Object.entries(savedState.prompts)) {
+        if (currentStates.prompts[identifier] !== undefined && currentStates.prompts[identifier] !== enabled) {
+            mismatches.push(identifier);
+        }
+    }
+
+    return mismatches;
 }
 
 /**
@@ -448,6 +463,7 @@ function applyPromptStatesDOM(savedPrompts, skipped) {
 }
 
 // ========== Prompt Manager UI Refresh ==========
+
 
 
 

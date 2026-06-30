@@ -83,19 +83,22 @@ let observerReinjectionCount = 0;
 let observerReinjectionResetTimer = null;
 const OBSERVER_REINJECTION_LIMIT = 10;
 const OBSERVER_REINJECTION_WINDOW = 30000;
+const UI_ENSURE_DELAYS_MS = [0, 300, 1000, 2000];
+let uiEnsureTimers = [];
 
 let lastButtonActionById = {};
 let uiInjectInProgress = false;
 let lastUIInjectAt = 0;
 let promptKeeperButtonDelegationBound = false;
+let promptKeeperButtonDelegatedEvents = '';
 const BUTTON_DEBOUNCE_MS = 1200;
 const UI_REINJECT_SETTLE_MS = 900;
 const PROMPT_KEEPER_BUTTON_SELECTOR = '#prompt-keeper-save, #prompt-keeper-restore, #prompt-keeper-delete';
-const BUTTON_EVENT_TYPES = window.PointerEvent
-    ? ['pointerup']
-    : ['touchend'];
+const ALL_BUTTON_EVENT_TYPES = ['pointerup', 'touchend', 'click'];
 const INTERACTION_DEBOUNCE_MS = 450;
 let saveInProgress = false;
+let migratedStatePersistTimer = null;
+let migratedStatePersistIdleId = null;
 
 let promptKeeperEventHandlersBound = false;
 let promptKeeperAppReadyHandled = false;

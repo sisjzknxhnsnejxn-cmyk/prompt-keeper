@@ -10,6 +10,6 @@
     "author": "sisjzknxhnsnejxn-cmyk",
     "version": "2.1.0",
     "homePage": "https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper",
-    "auto_update": true,
+    "auto_update": false,
     "update_url": "https://github.com/sisjzknxhnsnejxn-cmyk/prompt-keeper"
 }
