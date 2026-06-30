@@ -380,7 +380,7 @@
     .prompt-keeper-btn-group {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 7px;
+        gap: 4px;
     }
 
     .prompt-keeper-btn-group .menu_button {
@@ -398,18 +398,18 @@
     }
 
     #prompt-keeper-modal.pk-modal-overlay {
-        align-items: flex-end;
+        align-items: center;
         justify-content: center;
-        padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, calc(env(safe-area-inset-bottom) + 8px)) max(10px, env(safe-area-inset-left));
+        padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
         background: rgba(0, 0, 0, 0.5);
     }
 
     #prompt-keeper-modal .pk-modal-card {
-        width: 100%;
-        max-height: calc(88vh - max(0px, env(safe-area-inset-bottom)));
-        max-height: calc(88dvh - max(0px, env(safe-area-inset-bottom)));
-        max-height: calc(88svh - max(0px, env(safe-area-inset-bottom)));
-        border-radius: 22px 22px 16px 16px;
+        width: min(100%, 420px);
+        max-height: calc(88vh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom))));
+        max-height: calc(88dvh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom))));
+        max-height: calc(88svh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom))));
+        border-radius: 20px;
         padding: 16px;
         gap: 12px;
     }
