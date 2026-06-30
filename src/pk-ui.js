@@ -213,11 +213,34 @@ function bindNativeButtonEvent(button, eventType, useCapture = false) {
     });
 }
 
+function bindDocumentButtonEvent(eventType) {
+    document.removeEventListener(eventType, onPromptKeeperButtonPress, true);
+    document.addEventListener(eventType, onPromptKeeperButtonPress, {
+        capture: true,
+        passive: false,
+    });
+}
+
+function bindDelegatedButtonEvents() {
+    if (promptKeeperButtonDelegationBound) return;
+
+    for (const eventType of BUTTON_EVENT_TYPES) {
+        bindDocumentButtonEvent(eventType);
+    }
+
+    promptKeeperButtonDelegationBound = true;
+    console.debug(LOG_PREFIX, 'Document-level delegated button events bound.');
+}
+
 function getPromptKeeperButtonFromEvent(e) {
     const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
     for (const target of path) {
         if (target && target.id && ['prompt-keeper-save', 'prompt-keeper-restore', 'prompt-keeper-delete'].includes(target.id)) {
             return target;
+        }
+        if (target && target.closest) {
+            const button = target.closest(PROMPT_KEEPER_BUTTON_SELECTOR);
+            if (button) return button;
         }
     }
     return e.target && e.target.closest
@@ -393,6 +416,8 @@ function executeButtonAction(action, $btn, buttonId = 'unknown') {
 function bindButtonEvents() {
     const selectors = ['#prompt-keeper-save', '#prompt-keeper-restore', '#prompt-keeper-delete'];
 
+    bindDelegatedButtonEvents();
+
     for (const selector of selectors) {
         const $btn = jQuery(selector);
         if ($btn.length === 0) continue;
@@ -407,6 +432,7 @@ function bindButtonEvents() {
 
         $btn.prop('disabled', false)
             .attr('aria-disabled', 'false')
+            .attr('data-pk-action', selector.replace('#prompt-keeper-', ''))
             .removeClass('disabled interactable_disabled');
         for (const eventType of BUTTON_EVENT_TYPES) {
             // Edge + SillyTavern 1.16 有时会在冒泡阶段吞掉 menu_button 的 click，
@@ -420,7 +446,12 @@ function bindButtonEvents() {
 }
 
 function injectUI() {
-    if (jQuery('#prompt-keeper-bar').length > 0) return;
+    if (jQuery('#prompt-keeper-bar').length > 0) {
+        bindButtonEvents();
+        requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
+        console.debug(LOG_PREFIX, 'UI already exists; button events rebound.');
+        return;
+    }
     if (uiInjectInProgress) return;
 
     uiInjectInProgress = true;
@@ -433,15 +464,15 @@ function injectUI() {
             <span id="prompt-keeper-status" class="pk-not-saved">⚠ 无保存</span>
         </div>
         <div id="prompt-keeper-btn-group" class="prompt-keeper-btn-group">
-            <button type="button" id="prompt-keeper-save" class="menu_button" title="保存当前预设条目配置" aria-label="保存当前预设条目配置">
+            <button type="button" id="prompt-keeper-save" class="menu_button" data-pk-action="save" title="保存当前预设条目配置" aria-label="保存当前预设条目配置">
                 <i class="fa-solid fa-floppy-disk"></i>
                 <span>保存</span>
             </button>
-            <button type="button" id="prompt-keeper-restore" class="menu_button" title="恢复保存的预设条目配置" aria-label="恢复保存的预设条目配置">
+            <button type="button" id="prompt-keeper-restore" class="menu_button" data-pk-action="restore" title="恢复保存的预设条目配置" aria-label="恢复保存的预设条目配置">
                 <i class="fa-solid fa-rotate-left"></i>
                 <span>恢复</span>
             </button>
-            <button type="button" id="prompt-keeper-delete" class="menu_button" title="删除当前聊天的保存配置" aria-label="删除当前聊天的保存配置">
+            <button type="button" id="prompt-keeper-delete" class="menu_button" data-pk-action="delete" title="删除当前聊天的保存配置" aria-label="删除当前聊天的保存配置">
                 <i class="fa-solid fa-trash-can"></i>
                 <span>删除</span>
             </button>
@@ -529,12 +560,18 @@ function injectUI() {
 }
 
 function tryInjectUI(maxRetries = 15, interval = 1000) {
-    if (jQuery('#prompt-keeper-bar').length > 0) return;
+    if (jQuery('#prompt-keeper-bar').length > 0) {
+        bindButtonEvents();
+        return;
+    }
     if (uiInjectInProgress) return;
 
     let attempts = 0;
     const tryInject = () => {
-        if (jQuery('#prompt-keeper-bar').length > 0) return;
+        if (jQuery('#prompt-keeper-bar').length > 0) {
+            bindButtonEvents();
+            return;
+        }
         if (uiInjectInProgress) return;
         injectUI();
         if (jQuery('#prompt-keeper-bar').length === 0 && attempts < maxRetries) {
@@ -544,6 +581,8 @@ function tryInjectUI(maxRetries = 15, interval = 1000) {
     };
     tryInject();
 }
+
+
 
 
 

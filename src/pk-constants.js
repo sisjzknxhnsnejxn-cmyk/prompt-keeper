@@ -85,6 +85,7 @@ const OBSERVER_REINJECTION_WINDOW = 30000;
 let lastButtonActionById = {};
 let uiInjectInProgress = false;
 let lastUIInjectAt = 0;
+let promptKeeperButtonDelegationBound = false;
 const BUTTON_DEBOUNCE_MS = 400;
 const UI_REINJECT_SETTLE_MS = 900;
 const PROMPT_KEEPER_BUTTON_SELECTOR = '#prompt-keeper-save, #prompt-keeper-restore, #prompt-keeper-delete';
