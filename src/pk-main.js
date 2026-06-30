@@ -53,9 +53,14 @@ function destroyPromptKeeper(reason = 'manual') {
         migratedStatePersistIdleId = null;
     }
     clearPromptKeeperUIEnsureTimers();
+    stopPcUIWatchdog();
     if (observerRafId) {
         cancelAnimationFrame(observerRafId);
         observerRafId = null;
+    }
+    if (statusDisplayRafId) {
+        cancelAnimationFrame(statusDisplayRafId);
+        statusDisplayRafId = null;
     }
     if (uiObserver) {
         uiObserver.disconnect();
@@ -91,6 +96,8 @@ function destroyPromptKeeper(reason = 'manual') {
     promptKeeperAppReadyHandled = false;
     promptKeeperRefreshingUI = false;
     uiInjectInProgress = false;
+    pendingStatusDisplay = null;
+    lastStatusDisplaySignature = '';
     saveInProgress = false;
     lastButtonActionById = {};
 

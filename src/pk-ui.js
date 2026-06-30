@@ -11,15 +11,28 @@ function formatTime(timestamp) {
 }
 
 function updateStatusDisplay(hasSave, savedAt) {
-    requestAnimationFrame(() => {
+    pendingStatusDisplay = { hasSave, savedAt };
+    if (statusDisplayRafId) return;
+
+    statusDisplayRafId = requestAnimationFrame(() => {
+        statusDisplayRafId = null;
+        const pending = pendingStatusDisplay || { hasSave, savedAt };
+        pendingStatusDisplay = null;
+
         const $status = jQuery('#prompt-keeper-status');
         if ($status.length === 0) return;
 
-        if (hasSave) {
-            const timeStr = formatTime(savedAt || getSavedAt());
+        if (pending.hasSave) {
+            const timeStr = formatTime(pending.savedAt || getSavedAt());
             const label = timeStr ? `✓ 已保存 ${timeStr}` : '✓ 已保存';
+            const signature = `saved:${label}`;
+            if (lastStatusDisplaySignature === signature && $status.hasClass('pk-saved')) return;
+            lastStatusDisplaySignature = signature;
             $status.text(label).removeClass('pk-not-saved').addClass('pk-saved');
         } else {
+            const signature = 'empty';
+            if (lastStatusDisplaySignature === signature && $status.hasClass('pk-not-saved')) return;
+            lastStatusDisplaySignature = signature;
             $status.text('⚠ 无保存').removeClass('pk-saved').addClass('pk-not-saved');
         }
     });
@@ -353,6 +366,30 @@ function clearPromptKeeperUIEnsureTimers() {
     uiEnsureTimers = [];
 }
 
+function startPcUIWatchdog() {
+    if (pkIsCoarsePointerDevice() || pcUIWatchdogTimer) return;
+
+    pcUIWatchdogTimer = setInterval(() => {
+        if (observerPaused || uiInjectInProgress) return;
+
+        const barMissing = !document.getElementById('prompt-keeper-bar');
+        const settingsPanelMissing = document.getElementById('extensions_settings2') &&
+            !document.getElementById('prompt-keeper-settings');
+
+        if (barMissing || settingsPanelMissing) {
+            ensurePromptKeeperUI('pc_watchdog');
+        }
+    }, PC_UI_WATCHDOG_INTERVAL_MS);
+
+    console.debug(LOG_PREFIX, 'PC lightweight UI watchdog started.');
+}
+
+function stopPcUIWatchdog() {
+    if (!pcUIWatchdogTimer) return;
+    clearInterval(pcUIWatchdogTimer);
+    pcUIWatchdogTimer = null;
+}
+
 function schedulePromptKeeperUIEnsure(source = 'scheduled', delays = UI_ENSURE_DELAYS_MS) {
     clearPromptKeeperUIEnsureTimers();
 
@@ -429,7 +466,10 @@ function startUIObserver() {
     // SillyTavern 1.18.0 进入/切换聊天时会替换设置面板局部 DOM。
     // 监听 bar 的直接父节点容易挂到已被移除的旧节点上，因此改为监听更持久的外层容器。
     const observeTarget = getPersistentUIObserveTarget();
-    const useSubtree = true;
+    const useSubtree = pkIsCoarsePointerDevice();
+    if (!useSubtree) {
+        startPcUIWatchdog();
+    }
 
     uiObserver = new MutationObserver((mutations) => {
         if (observerPaused) return;

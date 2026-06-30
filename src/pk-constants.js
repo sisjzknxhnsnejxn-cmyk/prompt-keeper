@@ -84,11 +84,16 @@ let observerReinjectionResetTimer = null;
 const OBSERVER_REINJECTION_LIMIT = 10;
 const OBSERVER_REINJECTION_WINDOW = 30000;
 const UI_ENSURE_DELAYS_MS = [0, 300, 1000, 2000];
+const PC_UI_WATCHDOG_INTERVAL_MS = 2500;
 let uiEnsureTimers = [];
+let pcUIWatchdogTimer = null;
 
 let lastButtonActionById = {};
 let uiInjectInProgress = false;
 let lastUIInjectAt = 0;
+let statusDisplayRafId = null;
+let pendingStatusDisplay = null;
+let lastStatusDisplaySignature = '';
 let promptKeeperButtonDelegationBound = false;
 let promptKeeperButtonDelegatedEvents = '';
 const BUTTON_DEBOUNCE_MS = 1200;

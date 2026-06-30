@@ -379,26 +379,22 @@
 
     .prompt-keeper-btn-group {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-    }
-
-    .prompt-keeper-btn-group #prompt-keeper-restore {
-        grid-column: 1 / -1;
-        order: -1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
     }
 
     .prompt-keeper-btn-group .menu_button {
-        min-height: 48px;
-        padding: 9px 10px;
-        gap: 6px;
-        font-size: 16px;
+        min-height: 46px;
+        padding: 8px 7px;
+        gap: 5px;
+        font-size: 15px;
         border-radius: 12px;
         line-height: 1.15;
+        flex-direction: row;
     }
 
     .prompt-keeper-btn-group .menu_button span {
-        white-space: normal;
+        white-space: nowrap;
     }
 
     #prompt-keeper-modal.pk-modal-overlay {
@@ -457,9 +453,9 @@
 
 @media (max-width: 360px) {
     .prompt-keeper-btn-group .menu_button {
-        flex-direction: column;
         gap: 4px;
-        padding-inline: 8px;
+        padding-inline: 5px;
+        font-size: 14px;
     }
 }
 
