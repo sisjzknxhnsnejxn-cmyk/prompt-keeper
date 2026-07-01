@@ -296,8 +296,6 @@ function wbkLoadSettingsPanel() {
     jQuery('#wbk-enabled-toggle').prop('checked', settings.enabled !== false);
     jQuery('#wbk-auto-restore-toggle').prop('checked', settings.autoRestore === true);
     jQuery('#wbk-manage-selected-books-toggle').prop('checked', settings.manageSelectedBooks !== false);
-    jQuery('#wbk-manage-entry-states-toggle').prop('checked', settings.manageEntryStates !== false);
-    jQuery('#wbk-manage-entry-order-toggle').prop('checked', settings.manageEntryOrder !== false);
     jQuery('#wbk-capture-all-known-books-toggle').prop('checked', settings.captureAllKnownBooks === true);
     jQuery('#wbk-selected-books-restore-mode').val(settings.selectedBooksRestoreMode || WBK_DEFAULT_SETTINGS.selectedBooksRestoreMode);
     jQuery('#wbk-custom-save-name-toggle').prop('checked', settings.customSaveName === true);
@@ -319,8 +317,6 @@ function wbkLoadSettingsPanel() {
     bindToggle('#wbk-enabled-toggle', 'enabled', value => value ? '世界书保护已启用' : '世界书保护已关闭');
     bindToggle('#wbk-auto-restore-toggle', 'autoRestore', value => value ? '自动恢复已开' : '自动恢复已关');
     bindToggle('#wbk-manage-selected-books-toggle', 'manageSelectedBooks', '已更新世界书列表保护范围');
-    bindToggle('#wbk-manage-entry-states-toggle', 'manageEntryStates', '已更新条目蓝灯、绿灯和禁用状态保护范围');
-    bindToggle('#wbk-manage-entry-order-toggle', 'manageEntryOrder', value => value ? '恢复时会同步世界书条目顺序' : '恢复时不会修改世界书条目顺序');
     bindToggle('#wbk-capture-all-known-books-toggle', 'captureAllKnownBooks', '已更新世界书捕获范围');
     bindToggle('#wbk-custom-save-name-toggle', 'customSaveName', value => value ? '保存时会询问槽位名称' : '保存时使用启用的世界书名称');
 

@@ -44,14 +44,6 @@ const WBK_SETTINGS_HTML = `
                 <input type="checkbox" id="wbk-manage-selected-books-toggle" checked />
                 <span>保存/恢复已启用的世界书列表</span>
             </label>
-            <label class="checkbox_label" for="wbk-manage-entry-states-toggle">
-                <input type="checkbox" id="wbk-manage-entry-states-toggle" checked />
-                <span>保存/恢复世界书条目蓝灯、绿灯和禁用状态</span>
-            </label>
-            <label class="checkbox_label" for="wbk-manage-entry-order-toggle">
-                <input type="checkbox" id="wbk-manage-entry-order-toggle" checked />
-                <span>保存/恢复世界书条目顺序</span>
-            </label>
             <label class="checkbox_label" for="wbk-capture-all-known-books-toggle">
                 <input type="checkbox" id="wbk-capture-all-known-books-toggle" />
                 <span>保存全部已知世界书条目（默认仅保存当前启用世界书）</span>
@@ -73,10 +65,10 @@ const WBK_SETTINGS_HTML = `
         <details class="wbk-help-details">
             <summary>说明</summary>
             <div class="settings_section wbk-help-content">
-                <label><strong>保存范围：</strong>默认保存当前聊天已启用的世界书列表，以及这些世界书里的条目开关；高级选项可保存全部已知世界书条目。</label>
+                <label><strong>保存范围：</strong>默认保存当前聊天已启用的世界书列表，以及这些世界书里的条目状态和顺序；高级选项可保存全部已知世界书条目。</label>
                 <label><strong>冲突处理：</strong>恢复时默认合并当前与保存的启用世界书列表，避免覆盖你在酒馆里临时启用的其它世界书。</label>
-                <label><strong>条目状态：</strong>保护条目的禁用状态、蓝灯/选择性状态和绿灯/常驻状态。</label>
-                <label><strong>条目顺序：</strong>默认保存并恢复世界书条目排序，适合需要固定优先级的世界书。</label>
+                <label><strong>条目状态：</strong>始终保护条目的禁用状态、蓝灯/选择性状态和绿灯/常驻状态，无需手动选择。</label>
+                <label><strong>条目顺序：</strong>始终保存并恢复世界书条目排序，适合需要固定优先级的世界书。</label>
             </div>
         </details>
     </div>

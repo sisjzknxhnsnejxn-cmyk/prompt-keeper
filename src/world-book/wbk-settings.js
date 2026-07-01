@@ -21,6 +21,8 @@ function wbkLoadSettings() {
     if (!WBK_SELECTED_BOOKS_RESTORE_MODES.includes(settings.selectedBooksRestoreMode)) {
         settings.selectedBooksRestoreMode = WBK_DEFAULT_SETTINGS.selectedBooksRestoreMode;
     }
+    settings.manageEntryStates = true;
+    settings.manageEntryOrder = true;
     return settings;
 }
 
