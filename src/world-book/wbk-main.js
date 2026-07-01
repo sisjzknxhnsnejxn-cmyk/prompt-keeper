@@ -36,14 +36,47 @@ function wbkOnChatChanged(source = 'chat_changed') {
     const chatId = ctx.chatId;
     wbkScheduleUIEnsure(source);
     wbkUpdateStatusDisplay(wbkHasSavedState(), wbkGetSavedAt());
-    if (!chatId || wbkLastHandledChatId === chatId || wbkJustSavedChatId === chatId) return;
-    wbkLastHandledChatId = chatId;
-    if (!wbkIsAutoRestoreEnabled() || !wbkHasSavedState()) return;
-    if (wbkAutoRestoreTimer) clearTimeout(wbkAutoRestoreTimer);
-    wbkAutoRestoreTimer = setTimeout(() => {
+    if (!chatId) return;
+    if (wbkLastHandledChatId !== chatId) {
+        wbkLastHandledChatId = chatId;
+        wbkAutoRestoreRetryCountByChatId = {};
+    }
+    wbkScheduleRestoreForCurrentChat(source);
+}
+
+function wbkScheduleRestoreForCurrentChat(source = 'chat_changed', retryAttempt = 0) {
+    if (!wbkIsEnabled()) return;
+    const ctx = wbkGetCtx();
+    const chatId = ctx.chatId;
+    if (!chatId) return;
+
+    if (wbkAutoRestoreTimer) {
+        clearTimeout(wbkAutoRestoreTimer);
         wbkAutoRestoreTimer = null;
-        wbkRestoreStatesFromMetadata(true, null, { autoRestore: true });
-    }, WBK_AUTO_RESTORE_DELAY_MS);
+    }
+
+    const delay = retryAttempt > 0 ? WBK_AUTO_RESTORE_RETRY_DELAY_MS : WBK_AUTO_RESTORE_DELAY_MS;
+    wbkAutoRestoreTimer = setTimeout(async () => {
+        wbkAutoRestoreTimer = null;
+        if (!wbkIsEnabled() || wbkGetCtx().chatId !== chatId) return;
+
+        const hasSave = wbkHasSavedState();
+        requestAnimationFrame(() => wbkUpdateStatusDisplay(hasSave, wbkGetSavedAt()));
+        if (!hasSave || !wbkIsAutoRestoreEnabled() || wbkJustSavedChatId === chatId) return;
+
+        const restored = await wbkRestoreStatesFromMetadata(true, null, { autoRestore: true });
+        if (restored) {
+            wbkAutoRestoreRetryCountByChatId[chatId] = 0;
+            return;
+        }
+
+        const usedRetries = Number(wbkAutoRestoreRetryCountByChatId[chatId] || 0);
+        if (wbkGetCtx().chatId === chatId && usedRetries < WBK_AUTO_RESTORE_MAX_RETRIES) {
+            wbkAutoRestoreRetryCountByChatId[chatId] = usedRetries + 1;
+            console.warn(WBK_LOG_PREFIX, `Auto-restore failed for ${chatId}; retrying (${usedRetries + 1}/${WBK_AUTO_RESTORE_MAX_RETRIES}).`);
+            wbkScheduleRestoreForCurrentChat(`${source}_retry`, usedRetries + 1);
+        }
+    }, delay);
 }
 
 function wbkDestroyPromptKeeper(reason = 'manual') {
@@ -65,6 +98,7 @@ function wbkDestroyPromptKeeper(reason = 'manual') {
     wbkSaveInProgress = false;
     wbkLastButtonActionById = {};
     wbkLastInteractionByKey = {};
+    wbkAutoRestoreRetryCountByChatId = {};
     console.info(WBK_LOG_PREFIX, `World book runtime destroyed (${reason}).`);
 }
 
@@ -89,6 +123,7 @@ function _wbkInit() {
     wbkBindEvent(eventSource, eventTypes.APP_READY, wbkOnAppReady);
     wbkBindEvent(eventSource, eventTypes.CHAT_CHANGED, () => wbkOnChatChanged('chat_changed'));
     if (eventTypes.CHAT_LOADED) wbkBindEvent(eventSource, eventTypes.CHAT_LOADED, () => wbkOnChatChanged('chat_loaded'));
+    if (eventTypes.CHAT_COMPLETION_PROMPT_READY) wbkBindEvent(eventSource, eventTypes.CHAT_COMPLETION_PROMPT_READY, () => wbkOnChatChanged('prompt_ready'));
     if (eventTypes.WORLDINFO_SETTINGS_UPDATED) wbkBindEvent(eventSource, eventTypes.WORLDINFO_SETTINGS_UPDATED, () => wbkScheduleUIEnsure('worldinfo_settings_updated'));
     wbkScheduleUIEnsure('init_fallback');
 }

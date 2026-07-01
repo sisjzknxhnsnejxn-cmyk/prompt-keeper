@@ -11,9 +11,17 @@
     width: 100%;
     border: 1px solid var(--SmartThemeBorderColor, #555);
     border-radius: 5px;
+    background: rgba(127, 127, 127, 0.10);
     background: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.16)) 72%, transparent);
     box-sizing: border-box;
     max-width: 100%;
+}
+
+.wbk-world-info-toolbar {
+    position: relative;
+    clear: both;
+    flex: 0 0 auto;
+    min-width: 0;
 }
 
 .prompt-keeper-world-book-header {
@@ -51,6 +59,7 @@
     border-radius: 5px;
     cursor: pointer;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .prompt-keeper-world-book-btn-group .menu_button span {
@@ -65,20 +74,39 @@
 .wbk-not-saved { color: var(--SmartThemeEmColor, #fa0); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wbk-disabled { color: var(--SmartThemeBodyColor, #999); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
 
+body.wbk-modal-open {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    touch-action: none;
+}
+
 #prompt-keeper-world-book-modal.wbk-modal-overlay {
     position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
+    width: 100vw;
+    min-height: 100vh;
+    min-height: calc(var(--wbk-vh, 1vh) * 100);
     z-index: 20001;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 16px;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     background: rgba(0, 0, 0, 0.55);
     box-sizing: border-box;
+    overscroll-behavior: contain;
+    touch-action: none;
 }
 
 #prompt-keeper-world-book-modal .wbk-modal-card {
+    width: 460px;
     width: min(460px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: 72vh;
     max-height: min(72vh, 560px);
     max-height: min(72svh, 560px);
     max-height: min(72dvh, 560px);
@@ -90,6 +118,7 @@
     border-radius: 10px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
     overflow: hidden;
+    touch-action: auto;
 }
 
 #prompt-keeper-world-book-modal.wbk-modal-dark .wbk-modal-card,
@@ -98,16 +127,21 @@
     color: var(--SmartThemeBodyColor, inherit);
 }
 
-.wbk-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wbk-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.wbk-modal-title-group { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
+.wbk-modal-title-group strong { line-height: 1.2; }
+.wbk-modal-title-group small { line-height: 1.35; opacity: 0.72; overflow-wrap: anywhere; }
 .wbk-modal-theme,
 .wbk-modal-cancel,
-.wbk-slot-item { border: 0; cursor: pointer; touch-action: manipulation; }
+.wbk-slot-item { border: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
 .wbk-modal-theme { padding: 6px 10px; border-radius: 5px; background: var(--SmartThemeQuoteColor, #555); color: #fff; }
-.wbk-modal-cancel { padding: 10px; border-radius: 5px; background: rgba(127, 127, 127, 0.16); color: inherit; }
-.wbk-modal-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 2px; }
-.wbk-slot-item { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 10px; border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35)); border-radius: 5px; text-align: left; background: rgba(127, 127, 127, 0.08); color: inherit; }
+.wbk-modal-cancel { min-height: 42px; padding: 10px; border-radius: 5px; background: rgba(127, 127, 127, 0.16); color: inherit; }
+.wbk-modal-list { display: flex; flex-direction: column; gap: 8px; overflow-x: hidden; overflow-y: auto; padding-right: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.wbk-slot-item { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-height: 48px; padding: 10px; border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35)); border-radius: 5px; text-align: left; background: rgba(127, 127, 127, 0.08); color: inherit; }
 .wbk-slot-item:hover { background: rgba(127, 127, 127, 0.22); }
 .wbk-slot-delete:hover { background: rgba(220, 60, 60, 0.22); }
+.wbk-slot-confirming { border-color: rgba(230, 80, 80, 0.85); background: rgba(220, 60, 60, 0.18); }
+.wbk-slot-confirming .wbk-slot-time { color: #ffb3b3; opacity: 1; font-weight: 700; }
 .wbk-slot-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wbk-slot-name { font-weight: 700; overflow-wrap: anywhere; }
 .wbk-slot-default { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--SmartThemeQuoteColor, #555); color: #fff; font-size: 0.75em; }
@@ -119,23 +153,42 @@
 
 @media (max-width: 480px) {
     .prompt-keeper-world-book-bar { padding: 6px; flex-wrap: wrap; }
-    .prompt-keeper-world-book-header { gap: 6px; }
+    .prompt-keeper-world-book-header { gap: 6px; flex: 1 1 100%; }
     .prompt-keeper-world-book-btn-group { flex: 1 1 100%; display: flex; }
     .prompt-keeper-world-book-btn-group .menu_button { flex: 1 1 0; padding: 6px 4px; font-size: 0.9em; }
     .prompt-keeper-world-book-btn-group .menu_button span { white-space: nowrap; line-height: 1.15; }
-    #prompt-keeper-world-book-modal.wbk-modal-overlay { align-items: stretch; padding: 10px; }
-    #prompt-keeper-world-book-modal .wbk-modal-card { width: 100%; max-height: calc(100vh - 20px); max-height: calc(100svh - 20px); max-height: calc(100dvh - 20px); }
+    #prompt-keeper-world-book-modal.wbk-modal-overlay {
+        align-items: flex-end;
+        justify-content: center;
+        padding: 10px;
+        padding-top: max(10px, env(safe-area-inset-top));
+        padding-right: max(10px, env(safe-area-inset-right));
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        padding-left: max(10px, env(safe-area-inset-left));
+    }
+    #prompt-keeper-world-book-modal .wbk-modal-card {
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100vh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        max-height: calc((var(--wbk-vh, 1vh) * 100) - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        border-radius: 14px 14px 10px 10px;
+        padding: 12px;
+    }
+    .wbk-modal-theme { flex: 0 0 auto; min-height: 38px; }
+    .wbk-slot-item { min-height: 54px; padding: 12px; }
 }
 
 @media (max-width: 360px) {
     .prompt-keeper-world-book-btn-group .menu_button span { display: none; }
     .prompt-keeper-world-book-header { align-items: center; }
     .wbk-modal-header { flex-direction: column; align-items: stretch; }
+    .wbk-modal-theme { width: 100%; }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
     #prompt-keeper-world-book-modal.wbk-modal-overlay { align-items: stretch; padding: 8px; }
-    #prompt-keeper-world-book-modal .wbk-modal-card { max-height: calc(100vh - 16px); max-height: calc(100svh - 16px); max-height: calc(100dvh - 16px); padding: 10px; }
+    #prompt-keeper-world-book-modal .wbk-modal-card { max-height: calc(100vh - 16px); max-height: calc((var(--wbk-vh, 1vh) * 100) - 16px); padding: 10px; }
+    .wbk-modal-header { align-items: center; }
 }
 
 @media (pointer: coarse) {

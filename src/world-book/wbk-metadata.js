@@ -112,7 +112,7 @@ async function wbkRestoreStatesFromMetadata(silent = false, slotName = null, opt
         return false;
     }
 
-    if (options.autoRestore === true) await new Promise(resolve => setTimeout(resolve, 250));
+    if (options.autoRestore === true) await new Promise(resolve => setTimeout(resolve, 350));
     if (wbkGetCtx().chatId !== chatId) return false;
 
     const result = wbkApplyWorldBookState(slot.worldBookState);

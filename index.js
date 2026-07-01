@@ -44,6 +44,7 @@
     ];
 
     const styleNames = [
+        '../style.css',
         'world-book/wbk-style.css',
     ];
 

@@ -13,15 +13,11 @@ function pkIsCoarsePointerDevice() {
 }
 
 function pkGetButtonEventTypes() {
-    // PC 端只需要 click。pointerup + touchend + click 三套兜底会让事件路径更重，
-    // 在 SillyTavern 预设管理器大量 DOM/hover 场景下容易放大卡顿。
+    // PC 端只需要 click。触控端优先使用 Pointer Events；iOS Safari 12 以下再降级 touchend。
+    // 避免 pointerup + touchend + click 同时绑定导致同一次点击触发多条路径。
     if (!pkIsCoarsePointerDevice()) return ['click'];
-
-    return [
-        ...(window.PointerEvent ? ['pointerup'] : []),
-        'touchend',
-        'click',
-    ];
+    if (window.PointerEvent) return ['pointerup', 'click'];
+    return ['touchend', 'click'];
 }
 
 function pkScheduleIdleTask(callback, timeout = 1200) {

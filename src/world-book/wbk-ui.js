@@ -36,6 +36,12 @@ function wbkUpdateStatusDisplay(hasSave, savedAt) {
 
 function wbkCloseSlotPicker() {
     jQuery('#prompt-keeper-world-book-modal').remove();
+    jQuery(document.body).removeClass('wbk-modal-open');
+    jQuery(window).off('.wbkModalViewport');
+    if (window.visualViewport && typeof window.visualViewport.removeEventListener === 'function') {
+        window.visualViewport.removeEventListener('resize', wbkSetModalViewportHeight);
+        window.visualViewport.removeEventListener('scroll', wbkSetModalViewportHeight);
+    }
 }
 
 function wbkRemoveUI() {
@@ -49,13 +55,19 @@ function wbkIsElementVisible($element) {
     return Boolean(element.offsetParent || element.getClientRects().length > 0 || $element.is(':visible'));
 }
 
+function wbkIsExtensionSettingsElement($element) {
+    if (!$element || $element.length === 0) return false;
+    return $element.closest('#extensions_settings, #extensions_settings2, #extensions_settings_popup, .extensions_settings').length > 0;
+}
+
 function wbkGetWorldBookNativeContainer($element) {
     if (!$element || $element.length === 0) return jQuery();
-    return $element.closest('#WorldInfo, #world_info, .world_entry_form, .inline-drawer, .drawer-content, .popup, .popup-content').first();
+    return $element.closest('#WorldInfo, #world_info, #world_popup_entries_list, #world_info_entries, .world_entry_form').first();
 }
 
 function wbkIsInWorldBookNativeUI(element) {
     if (!element || !element.closest) return false;
+    if (element.closest('#extensions_settings, #extensions_settings2, #extensions_settings_popup, .extensions_settings')) return false;
     return Boolean(element.closest('#WorldInfo, #world_info, #world_editor_select, #world_info_entries, #world_popup_entries_list, .world_entry_form'));
 }
 
@@ -71,27 +83,32 @@ function wbkFindWorldBookNativeAnchor() {
     for (const selector of directCandidates) {
         const $target = jQuery(selector).filter(function () { return wbkIsElementVisible(jQuery(this)); }).first();
         if ($target.length === 0) continue;
+        if (wbkIsExtensionSettingsElement($target)) continue;
 
         const $container = wbkGetWorldBookNativeContainer($target);
         if ($container.length > 0) {
-            return { $target: $container, method: 'prepend' };
+            return { $target: $container, method: selector === '#world_editor_select' ? 'after' : 'prepend' };
         }
 
         return { $target, method: selector === '#world_editor_select' ? 'after' : 'before' };
     }
 
-    let found = null;
-    jQuery('.inline-drawer-header').each(function () {
-        if (found) return;
-        const $header = jQuery(this);
-        if (!wbkIsElementVisible($header)) return;
-        const text = $header.text().trim();
-        if (!/世界书|知识书|World Info|World Book|Lorebook/i.test(text)) return;
-        const $drawer = $header.closest('.inline-drawer');
-        if ($drawer.length > 0) found = { $target: $drawer, method: 'prepend' };
-    });
+    return null;
+}
 
-    return found;
+function wbkSetModalViewportHeight() {
+    const height = window.visualViewport && window.visualViewport.height ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--wbk-vh', `${height * 0.01}px`);
+}
+
+function wbkPrepareSlotPickerViewport() {
+    wbkSetModalViewportHeight();
+    jQuery(window).off('.wbkModalViewport').on('resize.wbkModalViewport orientationchange.wbkModalViewport', wbkSetModalViewportHeight);
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+        window.visualViewport.addEventListener('resize', wbkSetModalViewportHeight);
+        window.visualViewport.addEventListener('scroll', wbkSetModalViewportHeight);
+    }
+    jQuery(document.body).addClass('wbk-modal-open');
 }
 
 function wbkGetSlotPickerThemeLabel(theme) {
@@ -186,15 +203,20 @@ function wbkShowSlotPicker(mode) {
     }
 
     wbkCloseSlotPicker();
+    wbkPrepareSlotPickerViewport();
     const isDelete = mode === 'delete';
     const title = isDelete ? '删除世界书槽位' : '恢复世界书槽位';
+    const subtitle = isDelete ? '选择槽位后需再次点击确认删除，避免误触。' : '选择一个保存槽位来恢复世界书启用列表与条目状态。';
     const settings = wbkLoadSettings();
     const theme = settings.slotPickerTheme === 'dark' ? 'dark' : 'light';
     const $modal = jQuery(`
         <div id="prompt-keeper-world-book-modal" class="wbk-modal-overlay wbk-modal-${theme}">
             <div class="wbk-modal-card" role="dialog" aria-modal="true" aria-label="${title}">
                 <div class="wbk-modal-header">
-                    <strong>${title}</strong>
+                    <div class="wbk-modal-title-group">
+                        <strong>${title}</strong>
+                        <small>${subtitle}</small>
+                    </div>
                     <button type="button" class="wbk-modal-theme">${wbkGetSlotPickerThemeLabel(theme)}</button>
                 </div>
                 <div class="wbk-modal-list"></div>
@@ -203,9 +225,22 @@ function wbkShowSlotPicker(mode) {
         </div>`);
 
     const $list = $modal.find('.wbk-modal-list');
+    let pendingDeleteSlotName = null;
+    let pendingDeleteUntil = 0;
+    const resetDeleteConfirmState = () => {
+        pendingDeleteSlotName = null;
+        pendingDeleteUntil = 0;
+        $list.find('.wbk-slot-item').each(function () {
+            const $slot = jQuery(this);
+            const originalText = $slot.data('slotTimeText');
+            $slot.removeClass('wbk-slot-confirming');
+            if (originalText) $slot.find('.wbk-slot-time').text(originalText);
+        });
+    };
     for (const [name, slot] of slotEntries) {
         const isDefault = savedState.defaultSlot === name;
         const selectedBooks = ((slot.worldBookState && slot.worldBookState.selectedBooks) || []).join(' + ') || '无启用世界书';
+        const slotTimeText = `${selectedBooks} · 保存于 ${wbkFormatSlotTime(slot.savedAt)}`;
         const $item = jQuery(`
             <button type="button" class="wbk-slot-item ${isDelete ? 'wbk-slot-delete' : ''}">
                 <span class="wbk-slot-main">
@@ -215,17 +250,26 @@ function wbkShowSlotPicker(mode) {
                 <span class="wbk-slot-time"></span>
             </button>`);
         $item.find('.wbk-slot-name').text(name);
-        $item.find('.wbk-slot-time').text(`${selectedBooks} · 保存于 ${wbkFormatSlotTime(slot.savedAt)}`);
+        $item.find('.wbk-slot-time').text(slotTimeText);
+        $item.data('slotTimeText', slotTimeText);
         wbkBindPress($item, 'wbkSlotPress', `slot:${mode}:${name}`, async () => {
             wbkAnimatePressedButton($item);
+            if (isDelete) {
+                const now = Date.now();
+                const confirmed = pendingDeleteSlotName === name && now < pendingDeleteUntil;
+                if (!confirmed) {
+                    resetDeleteConfirmState();
+                    pendingDeleteSlotName = name;
+                    pendingDeleteUntil = now + 5000;
+                    $item.addClass('wbk-slot-confirming');
+                    $item.find('.wbk-slot-time').text('再次点击确认删除 · 5 秒内有效');
+                    return;
+                }
+            }
             $item.addClass('wbk-slot-working').prop('disabled', true);
             $list.find('.wbk-slot-item').not($item).prop('disabled', true).addClass('wbk-slot-disabled');
             if (isDelete) {
-                if (!window.confirm('删除此世界书槽位？')) {
-                    $item.removeClass('wbk-slot-working').prop('disabled', false);
-                    $list.find('.wbk-slot-item').not($item).prop('disabled', false).removeClass('wbk-slot-disabled');
-                    return;
-                }
+                $item.find('.wbk-slot-time').text('删除中…');
                 wbkDeleteSlotFromMetadata(name);
             } else {
                 $item.find('.wbk-slot-time').text('恢复中…');
@@ -295,7 +339,7 @@ function wbkInjectUI() {
     }
 
     const buttonBarHtml = `
-    <div id="prompt-keeper-world-book-bar" class="prompt-keeper-world-book-bar" data-wbk-root="true" role="toolbar" aria-label="世界书保护操作">
+    <div id="prompt-keeper-world-book-bar" class="prompt-keeper-world-book-bar wbk-world-info-toolbar" data-wbk-root="true" role="toolbar" aria-label="世界书保护操作">
         <div class="prompt-keeper-world-book-header">
             <i class="fa-solid fa-book-atlas"></i>
             <span>世界书保护</span>
