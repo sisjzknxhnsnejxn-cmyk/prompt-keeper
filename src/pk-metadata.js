@@ -326,7 +326,7 @@ function getAutoRestoreDelay() {
     return mobile ? Math.max(baseDelay, 2200) : baseDelay;
 }
 
-async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
+async function scheduleRestoreForCurrentChat(source = 'chat_changed', retryAttempt = 0) {
     if (!isPluginEnabled()) return;
 
     const ctx = getCtx();
@@ -335,6 +335,7 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
     if (newChatId !== lastHandledChatId) {
         justSavedChatId = null;
         lastHandledChatId = newChatId;
+        autoRestoreRetryCountByChatId = {};
     }
 
     if (autoRestoreTimer) {
@@ -348,7 +349,7 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
         return;
     }
 
-    const totalDelay = getAutoRestoreDelay();
+    const totalDelay = retryAttempt > 0 ? AUTO_RESTORE_RETRY_DELAY_MS : getAutoRestoreDelay();
 
     autoRestoreTimer = setTimeout(async () => {
         autoRestoreTimer = null;
@@ -376,7 +377,19 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
                 return;
             }
             console.log(LOG_PREFIX, `Auto-restore triggered for chat: ${newChatId}`);
-            await restoreStatesFromMetadata(true, null, { autoRestore: true });
+            const restored = await restoreStatesFromMetadata(true, null, { autoRestore: true });
+            if (!restored && getCtx().chatId === newChatId && isPluginEnabled() && isAutoRestoreEnabled()) {
+                const usedRetries = Number(autoRestoreRetryCountByChatId[newChatId] || 0);
+                if (usedRetries < AUTO_RESTORE_MAX_RETRIES) {
+                    autoRestoreRetryCountByChatId[newChatId] = usedRetries + 1;
+                    console.warn(LOG_PREFIX, `Auto-restore failed for ${newChatId}; retrying (${usedRetries + 1}/${AUTO_RESTORE_MAX_RETRIES}).`);
+                    scheduleRestoreForCurrentChat(`${source}_retry`, usedRetries + 1);
+                } else {
+                    console.warn(LOG_PREFIX, `Auto-restore failed for ${newChatId}; retry limit reached.`);
+                }
+            } else if (restored) {
+                autoRestoreRetryCountByChatId[newChatId] = 0;
+            }
         }
     }, totalDelay);
 
@@ -406,8 +419,3 @@ function onMainApiChanged() {
 }
 
 // ========== UI ==========
-
-
-
-
-

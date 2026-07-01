@@ -1,0 +1,144 @@
+/* Prompt Keeper World Book Styles */
+
+.prompt-keeper-world-book-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    margin: 8px 0;
+    width: 100%;
+    border: 1px solid var(--SmartThemeBorderColor, #555);
+    border-radius: 10px;
+    background: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.16));
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.prompt-keeper-world-book-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--SmartThemeBodyColor, #ccc);
+}
+
+.prompt-keeper-world-book-header i { color: var(--SmartThemeQuoteColor, #a8c8ff); }
+
+.prompt-keeper-world-book-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+}
+
+.prompt-keeper-world-book-btn-group .menu_button {
+    flex: 1 1 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 40px;
+    border-radius: 5px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.prompt-keeper-world-book-btn-group .menu_button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prompt-keeper-world-book-btn-group .menu_button.wbk-btn-active { filter: brightness(0.92); transform: translateY(1px); }
+
+.wbk-saved { color: var(--SmartThemeQuoteColor, #7c7); font-size: 0.8em; margin-left: auto; white-space: normal; overflow-wrap: anywhere; }
+.wbk-not-saved { color: var(--SmartThemeEmColor, #fa0); font-size: 0.8em; margin-left: auto; white-space: normal; overflow-wrap: anywhere; }
+.wbk-disabled { color: var(--SmartThemeBodyColor, #999); font-size: 0.8em; margin-left: auto; white-space: normal; overflow-wrap: anywhere; opacity: 0.75; }
+
+#prompt-keeper-world-book-modal.wbk-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    background: rgba(0, 0, 0, 0.55);
+    box-sizing: border-box;
+}
+
+#prompt-keeper-world-book-modal .wbk-modal-card {
+    width: min(460px, calc(100vw - 32px));
+    max-height: min(72vh, 560px);
+    max-height: min(72svh, 560px);
+    max-height: min(72dvh, 560px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--SmartThemeBorderColor, #666);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+#prompt-keeper-world-book-modal.wbk-modal-dark .wbk-modal-card,
+#prompt-keeper-world-book-modal.wbk-modal-light .wbk-modal-card {
+    background: var(--SmartThemeBlurTintColor, var(--SmartThemeBodyColor, #111));
+    color: var(--SmartThemeBodyColor, inherit);
+}
+
+.wbk-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wbk-modal-theme,
+.wbk-modal-cancel,
+.wbk-slot-item { border: 0; cursor: pointer; touch-action: manipulation; }
+.wbk-modal-theme { padding: 6px 10px; border-radius: 5px; background: var(--SmartThemeQuoteColor, #555); color: #fff; }
+.wbk-modal-cancel { padding: 10px; border-radius: 5px; background: rgba(127, 127, 127, 0.16); color: inherit; }
+.wbk-modal-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 2px; }
+.wbk-slot-item { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 10px; border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35)); border-radius: 5px; text-align: left; background: rgba(127, 127, 127, 0.08); color: inherit; }
+.wbk-slot-item:hover { background: rgba(127, 127, 127, 0.22); }
+.wbk-slot-delete:hover { background: rgba(220, 60, 60, 0.22); }
+.wbk-slot-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wbk-slot-name { font-weight: 700; overflow-wrap: anywhere; }
+.wbk-slot-default { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--SmartThemeQuoteColor, #555); color: #fff; font-size: 0.75em; }
+.wbk-slot-time { font-size: 0.82em; opacity: 0.78; overflow-wrap: anywhere; }
+.wbk-slot-disabled { opacity: 0.55; }
+.wbk-slot-working { outline: 2px solid var(--SmartThemeQuoteColor, #8ab4ff); }
+.wbk-help-details { margin-top: 8px; }
+.wbk-help-content label { display: block; margin: 4px 0; }
+
+@media (max-width: 480px) {
+    .prompt-keeper-world-book-bar { padding: 8px; }
+    .prompt-keeper-world-book-header { gap: 6px; }
+    .prompt-keeper-world-book-btn-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .prompt-keeper-world-book-btn-group .menu_button { min-width: 0; flex: none; padding: 8px 4px; font-size: 0.9em; }
+    .prompt-keeper-world-book-btn-group .menu_button span { white-space: normal; line-height: 1.15; }
+    #prompt-keeper-world-book-modal.wbk-modal-overlay { align-items: stretch; padding: 10px; }
+    #prompt-keeper-world-book-modal .wbk-modal-card { width: 100%; max-height: calc(100vh - 20px); max-height: calc(100svh - 20px); max-height: calc(100dvh - 20px); }
+}
+
+@media (max-width: 360px) {
+    .prompt-keeper-world-book-btn-group { grid-template-columns: 1fr; }
+    .prompt-keeper-world-book-header { align-items: flex-start; }
+    .wbk-saved, .wbk-not-saved, .wbk-disabled { margin-left: 0; flex-basis: 100%; }
+    .wbk-modal-header { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+    #prompt-keeper-world-book-modal.wbk-modal-overlay { align-items: stretch; padding: 8px; }
+    #prompt-keeper-world-book-modal .wbk-modal-card { max-height: calc(100vh - 16px); max-height: calc(100svh - 16px); max-height: calc(100dvh - 16px); padding: 10px; }
+}
+
+@media (pointer: coarse) {
+    .prompt-keeper-world-book-btn-group .menu_button:hover,
+    .wbk-slot-item:hover,
+    .wbk-slot-delete:hover { background-color: inherit; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .prompt-keeper-world-book-btn-group .menu_button,
+    .wbk-slot-item,
+    .wbk-modal-card { transition: none !important; animation: none !important; }
+}

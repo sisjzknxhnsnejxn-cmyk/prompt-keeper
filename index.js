@@ -2,7 +2,7 @@
  * Prompt Keeper - SillyTavern Plugin loader
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.1.0
+ * @version 3.0.0
  * @license MIT
  */
 
@@ -35,6 +35,16 @@
         'pk-ui.js',
         'pk-settings-panel.js',
         'pk-main.js',
+        'world-book/wbk-constants.js',
+        'world-book/wbk-settings.js',
+        'world-book/wbk-state.js',
+        'world-book/wbk-metadata.js',
+        'world-book/wbk-ui.js',
+        'world-book/wbk-main.js',
+    ];
+
+    const styleNames = [
+        'world-book/wbk-style.css',
     ];
 
     const getCurrentScriptUrl = () => {
@@ -100,6 +110,23 @@
         document.querySelectorAll('script[data-prompt-keeper-part]').forEach((script) => script.remove());
     };
 
+    const ensureRuntimeStyles = (cacheBust) => {
+        for (const name of styleNames) {
+            const styleId = `prompt-keeper-style-${name.replace(/[^a-z0-9_-]/gi, '-')}`;
+            const styleUrl = new URL(name, baseUrl);
+            styleUrl.searchParams.set('pk', cacheBust);
+            let link = document.getElementById(styleId);
+            if (!link) {
+                link = document.createElement('link');
+                link.id = styleId;
+                link.rel = 'stylesheet';
+                link.dataset.promptKeeperStyle = name;
+                document.head.appendChild(link);
+            }
+            link.href = styleUrl.toString();
+        }
+    };
+
     const destroyCurrentRuntime = () => {
         const runtime = window.PromptKeeper;
         if (runtime && typeof runtime.destroy === 'function') {
@@ -107,6 +134,13 @@
                 runtime.destroy('reload');
             } catch (error) {
                 console.warn('[PromptKeeper] Runtime destroy failed during reload:', error);
+            }
+        }
+        if (runtime && runtime.worldBook && typeof runtime.worldBook.destroy === 'function') {
+            try {
+                runtime.worldBook.destroy('reload');
+            } catch (error) {
+                console.warn('[PromptKeeper] World Book runtime destroy failed during reload:', error);
             }
         }
         removeLegacyScriptTags();
@@ -126,7 +160,7 @@
         }
 
         baseUrl = getExtensionBaseUrl();
-        const cacheBust = `v=2.1.0&t=${Date.now()}`;
+        const cacheBust = `v=3.0.0&t=${Date.now()}`;
 
         window[LOADER_STATE_KEY] = {
             status: 'loading',
@@ -149,7 +183,7 @@
         const footer = `
 ;window.PromptKeeper = Object.assign(window.PromptKeeper || {}, {
     id: ${JSON.stringify(runtimeId)},
-    version: '2.1.0',
+    version: '3.0.0',
     loadedAt: Date.now(),
     baseUrl: ${JSON.stringify(baseUrl)},
     reload: window.PromptKeeperReload,
@@ -157,6 +191,14 @@
     init: typeof _pkInit === 'function' ? _pkInit : null,
     updateStatusDisplay: typeof updateStatusDisplay === 'function' ? updateStatusDisplay : null,
     hasSavedState: typeof hasSavedState === 'function' ? hasSavedState : null,
+});
+window.PromptKeeper.worldBook = Object.assign(window.PromptKeeper.worldBook || {}, {
+    destroy: typeof wbkDestroyPromptKeeper === 'function' ? wbkDestroyPromptKeeper : function () {},
+    init: typeof _wbkInit === 'function' ? _wbkInit : null,
+    updateStatusDisplay: typeof wbkUpdateStatusDisplay === 'function' ? wbkUpdateStatusDisplay : null,
+    hasSavedState: typeof wbkHasSavedState === 'function' ? wbkHasSavedState : null,
+    save: typeof wbkSaveStatesToMetadata === 'function' ? wbkSaveStatesToMetadata : null,
+    restore: typeof wbkRestoreStatesFromMetadata === 'function' ? wbkRestoreStatesFromMetadata : null,
 });
 [
     'loadSettingsPanel', 'tryInjectUI', 'startUIObserver', 'updateStatusDisplay',
@@ -171,6 +213,7 @@
 `;
 
         Function(`"use strict";\n${parts.join('\n')}\n${footer}`)();
+        ensureRuntimeStyles(cacheBust);
 
         window[LOADER_STATE_KEY] = {
             status: 'loaded',
