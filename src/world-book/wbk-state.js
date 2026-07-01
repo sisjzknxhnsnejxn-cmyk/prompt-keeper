@@ -41,7 +41,7 @@ function wbkCollectSelectedWorldBooksFromObject(source, names, visited = new Set
 
     const selectionKeys = [
         'selected_world_info', 'selectedWorldInfo', 'selectedWorldInfos', 'selectedWorldBooks',
-        'world_names', 'worldNames', 'globalSelect', 'global_select', 'globalWorldInfo', 'globalWorldInfos',
+        'globalSelect', 'global_select', 'globalWorldInfo', 'globalWorldInfos',
         'globalLore', 'global_lore', 'chatLore', 'chat_lore', 'characterLore', 'character_lore',
         'charLore', 'char_lore', 'personaLore', 'persona_lore', 'characterBook', 'character_book',
         'personaBook', 'persona_book',
@@ -65,16 +65,85 @@ function wbkCollectSelectedWorldBooksFromObject(source, names, visited = new Set
     }
 }
 
+function wbkGetWorldInfoSelect() {
+    const $ = window.jQuery || window.$;
+    if (typeof $ !== 'function') return null;
+    return $('#world_info');
+}
+
+function wbkAsJQuery(element) {
+    const $ = window.jQuery || window.$;
+    return typeof $ === 'function' ? $(element) : null;
+}
+
+function wbkGetWorldBookNameFromOption($option, fallbackNames) {
+    if (!$option || $option.length === 0) return '';
+    const value = String($option.val() ?? '').trim();
+    const index = Number(value);
+    if (Number.isInteger(index) && fallbackNames[index]) return fallbackNames[index];
+    return String($option.text() || $option.attr('label') || value || '').trim();
+}
+
+function wbkGetWorldBookNamesFromSelect() {
+    const $select = wbkGetWorldInfoSelect();
+    if (!$select || $select.length === 0) return [];
+
+    const fallbackNames = wbkUniqueStrings([
+        ...wbkArrayFromMaybe(wbkGetCtx().world_names),
+        ...wbkArrayFromMaybe(window.world_names),
+    ]);
+    const names = [];
+    $select.find('option').each(function () {
+        wbkPushWorldBookName(names, wbkGetWorldBookNameFromOption(wbkAsJQuery(this), fallbackNames));
+    });
+    return wbkUniqueStrings(names);
+}
+
+function wbkGetSelectedWorldBooksFromSelect() {
+    const $select = wbkGetWorldInfoSelect();
+    if (!$select || $select.length === 0) return null;
+
+    const fallbackNames = wbkGetWorldBookNamesFromSelect();
+    const names = [];
+    $select.find('option:selected').each(function () {
+        wbkPushWorldBookName(names, wbkGetWorldBookNameFromOption(wbkAsJQuery(this), fallbackNames));
+    });
+    return wbkUniqueStrings(names);
+}
+
+function wbkGetPersistedGlobalWorldBooks() {
+    const ctx = wbkGetCtx();
+    const names = [];
+    const sources = [
+        ctx.world_info,
+        ctx.worldInfo,
+        window.world_info,
+        window.worldInfo,
+        window.world_info_settings,
+        window.worldInfoSettings,
+    ];
+
+    for (const source of sources) {
+        if (!source || typeof source !== 'object') continue;
+        wbkCollectWorldBookNamesFromValue(source.globalSelect, names);
+        wbkCollectWorldBookNamesFromValue(source.global_select, names);
+        wbkCollectWorldBookNamesFromValue(source.globalWorldInfo, names);
+        wbkCollectWorldBookNamesFromValue(source.globalWorldInfos, names);
+    }
+    return wbkUniqueStrings(names);
+}
+
 function wbkGetSelectedWorldBooks() {
     const ctx = wbkGetCtx();
     const names = [];
+    const selectedFromUi = wbkGetSelectedWorldBooksFromSelect();
+    if (selectedFromUi !== null) return selectedFromUi;
+
+    names.push(...wbkGetPersistedGlobalWorldBooks());
+
     const candidates = [
         ctx.selected_world_info,
         window.selected_world_info,
-        ctx.chatMetadata && ctx.chatMetadata.world_info,
-        ctx.chatMetadata && ctx.chatMetadata.selected_world_info,
-        ctx.world_names,
-        window.world_names,
     ];
 
     for (const candidate of candidates) {
@@ -102,6 +171,7 @@ function wbkAreStringArraysEqual(a, b) {
 function wbkGetAllWorldBookNames() {
     const ctx = wbkGetCtx();
     const names = [];
+    names.push(...wbkGetWorldBookNamesFromSelect());
     names.push(...wbkArrayFromMaybe(ctx.world_names));
     names.push(...wbkArrayFromMaybe(window.world_names));
     names.push(...wbkGetSelectedWorldBooks());
@@ -127,23 +197,56 @@ function wbkSetArrayTarget(target, key, names) {
     return true;
 }
 
+function wbkSetGlobalSelectTarget(target, names) {
+    if (!target || typeof target !== 'object') return false;
+    if (!target.globalSelect) {
+        target.globalSelect = [];
+    }
+    return wbkSetArrayTarget(target, 'globalSelect', names);
+}
+
+function wbkSetSelectedWorldBooksInSelect(names) {
+    const normalized = wbkUniqueStrings(names);
+    const $select = wbkGetWorldInfoSelect();
+    if (!$select || $select.length === 0) return false;
+
+    const fallbackNames = wbkGetWorldBookNamesFromSelect();
+    const targetLower = new Set(normalized.map(name => name.toLowerCase()));
+    const selectedValues = [];
+
+    $select.find('option').each(function () {
+        const $option = wbkAsJQuery(this);
+        const bookName = wbkGetWorldBookNameFromOption($option, fallbackNames);
+        if (bookName && targetLower.has(bookName.toLowerCase())) {
+            selectedValues.push(String($option.val()));
+        }
+    });
+
+    const currentValues = wbkArrayFromMaybe($select.val()).map(value => String(value));
+    if (wbkAreStringArraysEqual(currentValues, selectedValues)) return false;
+    $select.val(selectedValues).trigger('change');
+    return true;
+}
+
 function wbkSetSelectedWorldBooks(names) {
     const normalized = wbkUniqueStrings(names);
     const ctx = wbkGetCtx();
     let changed = false;
 
+    changed = wbkSetSelectedWorldBooksInSelect(normalized) || changed;
+    changed = wbkSetGlobalSelectTarget(ctx.world_info, normalized) || changed;
+    changed = wbkSetGlobalSelectTarget(ctx.worldInfo, normalized) || changed;
+    changed = wbkSetGlobalSelectTarget(window.world_info, normalized) || changed;
+    changed = wbkSetGlobalSelectTarget(window.worldInfo, normalized) || changed;
+    changed = wbkSetGlobalSelectTarget(window.world_info_settings, normalized) || changed;
+    changed = wbkSetGlobalSelectTarget(window.worldInfoSettings, normalized) || changed;
     changed = wbkSetArrayTarget(ctx, 'selected_world_info', normalized) || changed;
     changed = wbkSetArrayTarget(window, 'selected_world_info', normalized) || changed;
     changed = wbkSetArrayTarget(ctx, 'world_names', normalized) || changed;
     changed = wbkSetArrayTarget(window, 'world_names', normalized) || changed;
-    if (ctx.chatMetadata && ('world_info' in ctx.chatMetadata || 'selected_world_info' in ctx.chatMetadata)) {
-        changed = wbkSetArrayTarget(ctx.chatMetadata, 'world_info', normalized) || changed;
-        changed = wbkSetArrayTarget(ctx.chatMetadata, 'selected_world_info', normalized) || changed;
-        wbkPersistChatMetadata();
-    }
 
     const eventSource = ctx.eventSource;
-    const eventTypes = ctx.event_types || {};
+    const eventTypes = ctx.event_types || ctx.eventTypes || {};
     if (eventSource && typeof eventSource.emit === 'function') {
         for (const eventName of ['WORLDINFO_SETTINGS_UPDATED', 'WORLDINFO_UPDATED', 'SETTINGS_UPDATED']) {
             if (eventTypes[eventName]) eventSource.emit(eventTypes[eventName]);
