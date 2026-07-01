@@ -2,15 +2,15 @@
 
 .prompt-keeper-world-book-bar {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    padding: 6px 8px;
-    margin: 6px 0;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 9px 10px;
+    margin: 8px 0 10px;
     width: 100%;
     border: 1px solid var(--SmartThemeBorderColor, #555);
-    border-radius: 5px;
+    border-radius: 10px;
     background: rgba(127, 127, 127, 0.10);
     background: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.16)) 72%, transparent);
     box-sizing: border-box;
@@ -26,37 +26,51 @@
 
 .prompt-keeper-world-book-header {
     display: flex;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     flex-wrap: nowrap;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     min-width: 0;
-    font-size: 0.9em;
+    font-size: 14px;
+    line-height: 1.35;
     font-weight: 600;
     color: var(--SmartThemeBodyColor, #ccc);
 }
 
 .prompt-keeper-world-book-header i { color: var(--SmartThemeQuoteColor, #a8c8ff); }
 
+.prompt-keeper-world-book-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .prompt-keeper-world-book-btn-group {
     display: flex;
     flex: 0 0 auto;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 4px;
-    width: auto;
+    gap: 6px;
+    width: 100%;
 }
 
 .prompt-keeper-world-book-btn-group .menu_button {
-    flex: 0 0 auto;
+    flex: 1 1 0;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
-    min-height: 28px;
+    min-height: 36px;
     min-width: 0;
-    padding: 4px 8px;
-    border-radius: 5px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.2;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -70,9 +84,9 @@
 
 .prompt-keeper-world-book-btn-group .menu_button.wbk-btn-active { filter: brightness(0.92); transform: translateY(1px); }
 
-.wbk-saved { color: var(--SmartThemeQuoteColor, #7c7); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wbk-not-saved { color: var(--SmartThemeEmColor, #fa0); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wbk-disabled { color: var(--SmartThemeBodyColor, #999); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
+.wbk-saved { color: var(--SmartThemeQuoteColor, #7c7); font-size: 13px; font-weight: 500; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbk-not-saved { color: var(--SmartThemeEmColor, #fa0); font-size: 13px; font-weight: 500; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbk-disabled { color: var(--SmartThemeBodyColor, #999); font-size: 13px; font-weight: 500; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
 
 body.wbk-modal-open {
     overflow: hidden;
@@ -113,9 +127,9 @@ body.wbk-modal-open {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 12px;
+    padding: 14px;
     border: 1px solid var(--SmartThemeBorderColor, #666);
-    border-radius: 10px;
+    border-radius: 14px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
     overflow: hidden;
     touch-action: auto;
@@ -127,35 +141,35 @@ body.wbk-modal-open {
     color: var(--SmartThemeBodyColor, inherit);
 }
 
-.wbk-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.wbk-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .wbk-modal-title-group { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
-.wbk-modal-title-group strong { line-height: 1.2; }
-.wbk-modal-title-group small { line-height: 1.35; opacity: 0.72; overflow-wrap: anywhere; }
+.wbk-modal-title-group strong { font-size: 16px; line-height: 1.25; }
+.wbk-modal-title-group small { font-size: 13px; line-height: 1.4; opacity: 0.72; overflow-wrap: anywhere; }
 .wbk-modal-theme,
 .wbk-modal-cancel,
 .wbk-slot-item { border: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
-.wbk-modal-theme { padding: 6px 10px; border-radius: 5px; background: var(--SmartThemeQuoteColor, #555); color: #fff; }
-.wbk-modal-cancel { min-height: 42px; padding: 10px; border-radius: 5px; background: rgba(127, 127, 127, 0.16); color: inherit; }
+.wbk-modal-theme { min-height: 36px; padding: 7px 10px; border-radius: 8px; background: var(--SmartThemeQuoteColor, #555); color: #fff; font-size: 13px; line-height: 1.2; }
+.wbk-modal-cancel { min-height: 44px; padding: 11px; border-radius: 10px; background: rgba(127, 127, 127, 0.16); color: inherit; font-size: 15px; line-height: 1.2; }
 .wbk-modal-list { display: flex; flex-direction: column; gap: 8px; overflow-x: hidden; overflow-y: auto; padding-right: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.wbk-slot-item { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-height: 48px; padding: 10px; border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35)); border-radius: 5px; text-align: left; background: rgba(127, 127, 127, 0.08); color: inherit; }
+.wbk-slot-item { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-height: 54px; padding: 11px 12px; border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35)); border-radius: 10px; text-align: left; background: rgba(127, 127, 127, 0.08); color: inherit; }
 .wbk-slot-item:hover { background: rgba(127, 127, 127, 0.22); }
 .wbk-slot-delete:hover { background: rgba(220, 60, 60, 0.22); }
 .wbk-slot-confirming { border-color: rgba(230, 80, 80, 0.85); background: rgba(220, 60, 60, 0.18); }
 .wbk-slot-confirming .wbk-slot-time { color: #ffb3b3; opacity: 1; font-weight: 700; }
 .wbk-slot-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.wbk-slot-name { font-weight: 700; overflow-wrap: anywhere; }
-.wbk-slot-default { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--SmartThemeQuoteColor, #555); color: #fff; font-size: 0.75em; }
-.wbk-slot-time { font-size: 0.82em; opacity: 0.78; overflow-wrap: anywhere; }
+.wbk-slot-name { font-size: 15px; line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; }
+.wbk-slot-default { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: var(--SmartThemeQuoteColor, #555); color: #fff; font-size: 12px; line-height: 1.25; }
+.wbk-slot-time { font-size: 13px; line-height: 1.35; opacity: 0.78; overflow-wrap: anywhere; }
 .wbk-slot-disabled { opacity: 0.55; }
 .wbk-slot-working { outline: 2px solid var(--SmartThemeQuoteColor, #8ab4ff); }
 .wbk-help-details { margin-top: 8px; }
 .wbk-help-content label { display: block; margin: 4px 0; }
 
 @media (max-width: 480px) {
-    .prompt-keeper-world-book-bar { padding: 6px; flex-wrap: wrap; }
-    .prompt-keeper-world-book-header { gap: 6px; flex: 1 1 100%; }
-    .prompt-keeper-world-book-btn-group { flex: 1 1 100%; display: flex; }
-    .prompt-keeper-world-book-btn-group .menu_button { flex: 1 1 0; padding: 6px 4px; font-size: 0.9em; }
+    .prompt-keeper-world-book-bar { gap: 8px; padding: 10px; margin: 8px 0 10px; flex-wrap: nowrap; border-radius: 12px; }
+    .prompt-keeper-world-book-header { gap: 8px; flex: 0 0 auto; font-size: 14px; }
+    .prompt-keeper-world-book-btn-group { flex: 0 0 auto; display: flex; gap: 6px; }
+    .prompt-keeper-world-book-btn-group .menu_button { min-height: 44px; flex: 1 1 0; padding: 9px 6px; font-size: 14px; border-radius: 10px; }
     .prompt-keeper-world-book-btn-group .menu_button span { white-space: nowrap; line-height: 1.15; }
     #prompt-keeper-world-book-modal.wbk-modal-overlay {
         align-items: flex-end;
@@ -171,15 +185,21 @@ body.wbk-modal-open {
         max-width: 100%;
         max-height: calc(100vh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         max-height: calc((var(--wbk-vh, 1vh) * 100) - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-        border-radius: 14px 14px 10px 10px;
-        padding: 12px;
+        border-radius: 18px 18px 12px 12px;
+        padding: 14px;
+        gap: 12px;
     }
-    .wbk-modal-theme { flex: 0 0 auto; min-height: 38px; }
-    .wbk-slot-item { min-height: 54px; padding: 12px; }
+    .wbk-modal-theme { flex: 0 0 auto; min-height: 40px; font-size: 13px; }
+    .wbk-modal-cancel { min-height: 46px; font-size: 15px; }
+    .wbk-modal-title-group strong { font-size: 16px; }
+    .wbk-modal-title-group small { font-size: 13px; }
+    .wbk-modal-list { gap: 9px; max-height: min(58vh, 430px); }
+    .wbk-slot-item { min-height: 56px; padding: 12px; border-radius: 12px; }
 }
 
 @media (max-width: 360px) {
-    .prompt-keeper-world-book-btn-group .menu_button span { display: none; }
+    .prompt-keeper-world-book-header { font-size: 13px; }
+    .prompt-keeper-world-book-btn-group .menu_button { font-size: 13px; }
     .prompt-keeper-world-book-header { align-items: center; }
     .wbk-modal-header { flex-direction: column; align-items: stretch; }
     .wbk-modal-theme { width: 100%; }

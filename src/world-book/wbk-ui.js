@@ -60,6 +60,12 @@ function wbkIsExtensionSettingsElement($element) {
     return $element.closest('#extensions_settings, #extensions_settings2, #extensions_settings_popup, .extensions_settings').length > 0;
 }
 
+function wbkGetOpenWorldInfoRoot() {
+    return jQuery('#WorldInfo.drawer-content.openDrawer, #WorldInfo.openDrawer')
+        .filter(function () { return wbkIsElementVisible(jQuery(this)); })
+        .first();
+}
+
 function wbkGetWorldBookNativeContainer($element) {
     if (!$element || $element.length === 0) return jQuery();
     return $element.closest('#WorldInfo, #world_info, #world_popup_entries_list, #world_info_entries, .world_entry_form').first();
@@ -68,32 +74,38 @@ function wbkGetWorldBookNativeContainer($element) {
 function wbkIsInWorldBookNativeUI(element) {
     if (!element || !element.closest) return false;
     if (element.closest('#extensions_settings, #extensions_settings2, #extensions_settings_popup, .extensions_settings')) return false;
-    return Boolean(element.closest('#WorldInfo, #world_info, #world_editor_select, #world_info_entries, #world_popup_entries_list, .world_entry_form'));
+    const $worldInfoRoot = wbkGetOpenWorldInfoRoot();
+    return $worldInfoRoot.length > 0 && $worldInfoRoot[0].contains(element);
 }
 
 function wbkFindWorldBookNativeAnchor() {
-    const directCandidates = [
-        '#world_editor_select',
-        '#world_info_entries',
-        '#world_popup_entries_list',
-        '#WorldInfo',
-        '#world_info',
+    const $worldInfoRoot = wbkGetOpenWorldInfoRoot();
+    if ($worldInfoRoot.length === 0 || wbkIsExtensionSettingsElement($worldInfoRoot)) return null;
+
+    const scopedCandidates = [
+        { selector: '#wiTopBlock', method: 'after' },
+        { selector: '#world_popup', method: 'before' },
+        { selector: '#wi-holder', method: 'prepend' },
+        { selector: '.flex1.flex.alignSelfStart.range-block', method: 'append' },
+        { selector: '#world_editor_select', method: 'after' },
+        { selector: '#world_info_entries', method: 'prepend' },
+        { selector: '#world_popup_entries_list', method: 'prepend' },
     ];
 
-    for (const selector of directCandidates) {
-        const $target = jQuery(selector).filter(function () { return wbkIsElementVisible(jQuery(this)); }).first();
+    for (const candidate of scopedCandidates) {
+        const $target = $worldInfoRoot.find(candidate.selector).filter(function () { return wbkIsElementVisible(jQuery(this)); }).first();
         if ($target.length === 0) continue;
         if (wbkIsExtensionSettingsElement($target)) continue;
 
         const $container = wbkGetWorldBookNativeContainer($target);
-        if ($container.length > 0) {
-            return { $target: $container, method: selector === '#world_editor_select' ? 'after' : 'prepend' };
+        if ($container.length > 0 && $container[0] !== $worldInfoRoot[0] && $worldInfoRoot[0].contains($container[0])) {
+            return { $target: $container, method: candidate.method };
         }
 
-        return { $target, method: selector === '#world_editor_select' ? 'after' : 'before' };
+        return { $target, method: candidate.method };
     }
 
-    return null;
+    return { $target: $worldInfoRoot, method: 'prepend' };
 }
 
 function wbkSetModalViewportHeight() {
@@ -341,8 +353,7 @@ function wbkInjectUI() {
     const buttonBarHtml = `
     <div id="prompt-keeper-world-book-bar" class="prompt-keeper-world-book-bar wbk-world-info-toolbar" data-wbk-root="true" role="toolbar" aria-label="世界书保护操作">
         <div class="prompt-keeper-world-book-header">
-            <i class="fa-solid fa-book-atlas"></i>
-            <span>世界书保护</span>
+            <span class="prompt-keeper-world-book-title"><i class="fa-solid fa-book-atlas"></i><span>世界书保护</span></span>
             <span id="prompt-keeper-world-book-status" class="wbk-not-saved">⚠ 无保存</span>
         </div>
         <div class="prompt-keeper-world-book-btn-group">
@@ -359,6 +370,7 @@ function wbkInjectUI() {
     }
 
     if (anchor.method === 'prepend') anchor.$target.prepend(buttonBarHtml);
+    else if (anchor.method === 'append') anchor.$target.append(buttonBarHtml);
     else if (anchor.method === 'after') anchor.$target.after(buttonBarHtml);
     else anchor.$target.before(buttonBarHtml);
 
