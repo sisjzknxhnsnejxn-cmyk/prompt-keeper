@@ -28,7 +28,10 @@ function wbkOnAppReady() {
 }
 
 function wbkOnChatChanged(source = 'chat_changed') {
-    if (!wbkIsEnabled()) return;
+    if (!wbkIsEnabled()) {
+        wbkRemoveUI();
+        return;
+    }
     const ctx = wbkGetCtx();
     const chatId = ctx.chatId;
     wbkScheduleUIEnsure(source);

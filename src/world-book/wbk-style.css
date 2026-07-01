@@ -2,23 +2,27 @@
 
 .prompt-keeper-world-book-bar {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px;
-    margin: 8px 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 8px;
+    margin: 6px 0;
     width: 100%;
     border: 1px solid var(--SmartThemeBorderColor, #555);
-    border-radius: 10px;
-    background: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.16));
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.16)) 72%, transparent);
     box-sizing: border-box;
     max-width: 100%;
 }
 
 .prompt-keeper-world-book-header {
     display: flex;
-    flex-wrap: wrap;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
     font-size: 0.9em;
     font-weight: 600;
     color: var(--SmartThemeBodyColor, #ccc);
@@ -28,18 +32,22 @@
 
 .prompt-keeper-world-book-btn-group {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    width: 100%;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    width: auto;
 }
 
 .prompt-keeper-world-book-btn-group .menu_button {
-    flex: 1 1 120px;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
-    min-height: 40px;
+    min-height: 28px;
+    min-width: 0;
+    padding: 4px 8px;
     border-radius: 5px;
     cursor: pointer;
     touch-action: manipulation;
@@ -53,9 +61,9 @@
 
 .prompt-keeper-world-book-btn-group .menu_button.wbk-btn-active { filter: brightness(0.92); transform: translateY(1px); }
 
-.wbk-saved { color: var(--SmartThemeQuoteColor, #7c7); font-size: 0.8em; margin-left: auto; white-space: normal; overflow-wrap: anywhere; }
-.wbk-not-saved { color: var(--SmartThemeEmColor, #fa0); font-size: 0.8em; margin-left: auto; white-space: normal; overflow-wrap: anywhere; }
-.wbk-disabled { color: var(--SmartThemeBodyColor, #999); font-size: 0.8em; margin-left: auto; white-space: normal; overflow-wrap: anywhere; opacity: 0.75; }
+.wbk-saved { color: var(--SmartThemeQuoteColor, #7c7); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbk-not-saved { color: var(--SmartThemeEmColor, #fa0); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbk-disabled { color: var(--SmartThemeBodyColor, #999); font-size: 0.8em; margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
 
 #prompt-keeper-world-book-modal.wbk-modal-overlay {
     position: fixed;
@@ -110,19 +118,18 @@
 .wbk-help-content label { display: block; margin: 4px 0; }
 
 @media (max-width: 480px) {
-    .prompt-keeper-world-book-bar { padding: 8px; }
+    .prompt-keeper-world-book-bar { padding: 6px; flex-wrap: wrap; }
     .prompt-keeper-world-book-header { gap: 6px; }
-    .prompt-keeper-world-book-btn-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .prompt-keeper-world-book-btn-group .menu_button { min-width: 0; flex: none; padding: 8px 4px; font-size: 0.9em; }
-    .prompt-keeper-world-book-btn-group .menu_button span { white-space: normal; line-height: 1.15; }
+    .prompt-keeper-world-book-btn-group { flex: 1 1 100%; display: flex; }
+    .prompt-keeper-world-book-btn-group .menu_button { flex: 1 1 0; padding: 6px 4px; font-size: 0.9em; }
+    .prompt-keeper-world-book-btn-group .menu_button span { white-space: nowrap; line-height: 1.15; }
     #prompt-keeper-world-book-modal.wbk-modal-overlay { align-items: stretch; padding: 10px; }
     #prompt-keeper-world-book-modal .wbk-modal-card { width: 100%; max-height: calc(100vh - 20px); max-height: calc(100svh - 20px); max-height: calc(100dvh - 20px); }
 }
 
 @media (max-width: 360px) {
-    .prompt-keeper-world-book-btn-group { grid-template-columns: 1fr; }
-    .prompt-keeper-world-book-header { align-items: flex-start; }
-    .wbk-saved, .wbk-not-saved, .wbk-disabled { margin-left: 0; flex-basis: 100%; }
+    .prompt-keeper-world-book-btn-group .menu_button span { display: none; }
+    .prompt-keeper-world-book-header { align-items: center; }
     .wbk-modal-header { flex-direction: column; align-items: stretch; }
 }
 
