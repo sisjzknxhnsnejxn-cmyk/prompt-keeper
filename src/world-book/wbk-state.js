@@ -6,21 +6,90 @@ function wbkArrayFromMaybe(value) {
     return [];
 }
 
+function wbkPushWorldBookName(names, value) {
+    const normalized = String(value || '').trim();
+    if (normalized) names.push(normalized);
+}
+
+function wbkCollectWorldBookNamesFromValue(value, names, visited = new Set()) {
+    if (value === null || value === undefined) return;
+    if (typeof value === 'string' || typeof value === 'number') {
+        for (const item of wbkArrayFromMaybe(String(value))) wbkPushWorldBookName(names, item);
+        return;
+    }
+    if (Array.isArray(value)) {
+        for (const item of value) wbkCollectWorldBookNamesFromValue(item, names, visited);
+        return;
+    }
+    if (typeof value !== 'object' || visited.has(value)) return;
+    visited.add(value);
+
+    for (const key of ['name', 'worldName', 'world_name', 'world', 'book', 'bookName', 'filename', 'file']) {
+        if (typeof value[key] === 'string' || typeof value[key] === 'number') wbkPushWorldBookName(names, value[key]);
+    }
+
+    for (const key of ['value', 'label']) {
+        if (typeof value[key] === 'string' && (value.selected === true || value.enabled === true || value.checked === true)) {
+            wbkPushWorldBookName(names, value[key]);
+        }
+    }
+}
+
+function wbkCollectSelectedWorldBooksFromObject(source, names, visited = new Set(), depth = 0) {
+    if (!source || typeof source !== 'object' || visited.has(source) || depth > 3) return;
+    visited.add(source);
+
+    const selectionKeys = [
+        'selected_world_info', 'selectedWorldInfo', 'selectedWorldInfos', 'selectedWorldBooks',
+        'world_names', 'worldNames', 'globalSelect', 'global_select', 'globalWorldInfo', 'globalWorldInfos',
+        'globalLore', 'global_lore', 'chatLore', 'chat_lore', 'characterLore', 'character_lore',
+        'charLore', 'char_lore', 'personaLore', 'persona_lore', 'characterBook', 'character_book',
+        'personaBook', 'persona_book',
+    ];
+
+    for (const key of selectionKeys) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            wbkCollectWorldBookNamesFromValue(source[key], names, visited);
+        }
+    }
+
+    const nestedKeys = [
+        'worldInfoSettings', 'world_info_settings', 'settings',
+        'chatMetadata', 'character', 'characters', 'this_chid', 'groups', 'extensionSettings',
+    ];
+
+    for (const key of nestedKeys) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            wbkCollectSelectedWorldBooksFromObject(source[key], names, visited, depth + 1);
+        }
+    }
+}
+
 function wbkGetSelectedWorldBooks() {
     const ctx = wbkGetCtx();
+    const names = [];
     const candidates = [
         ctx.selected_world_info,
         window.selected_world_info,
         ctx.chatMetadata && ctx.chatMetadata.world_info,
         ctx.chatMetadata && ctx.chatMetadata.selected_world_info,
+        ctx.world_names,
+        window.world_names,
     ];
 
     for (const candidate of candidates) {
-        const values = wbkArrayFromMaybe(candidate);
-        if (values.length > 0) return wbkUniqueStrings(values);
+        wbkCollectWorldBookNamesFromValue(candidate, names);
     }
 
-    return wbkUniqueStrings(wbkArrayFromMaybe(ctx.world_names).concat(wbkArrayFromMaybe(window.world_names)));
+    // Only inspect objects that represent current chat/runtime selection state.
+    // Do not scan world_info/worldInfo/world_info_data here: those objects can contain
+    // every known world book, which would make "selected books" indistinguishable from
+    // "all known books" and make captureAllKnownBooks behave like it is always enabled.
+    for (const source of [ctx, window.world_info_settings, window.worldInfoSettings, ctx.chatMetadata]) {
+        wbkCollectSelectedWorldBooksFromObject(source, names);
+    }
+
+    return wbkUniqueStrings(names);
 }
 
 function wbkAreStringArraysEqual(a, b) {
