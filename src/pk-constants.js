@@ -3,7 +3,7 @@
  * Saves and restores Prompt Manager entry states (enabled + order) AND the active preset per chat session.
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 3.0.0
+ * @version 2.1.0
  * @license MIT
  */
 
@@ -23,14 +23,12 @@ const DEFAULT_SETTINGS = {
     slotPickerTheme: 'light',
 };
 
-const AUTO_RESTORE_CONTEXT_TIMEOUT_MS = 3500;
+const AUTO_RESTORE_CONTEXT_TIMEOUT_MS = 2500;
 const AUTO_RESTORE_CONTEXT_POLL_MS = 100;
-const PRESET_SWITCH_TIMEOUT_MS = 3000;
+const PRESET_SWITCH_TIMEOUT_MS = 1200;
 const PRESET_SWITCH_POLL_MS = 50;
-const PROMPT_STATE_READY_TIMEOUT_MS = 3000;
+const PROMPT_STATE_READY_TIMEOUT_MS = 1200;
 const PROMPT_STATE_READY_POLL_MS = 50;
-const AUTO_RESTORE_MAX_RETRIES = 2;
-const AUTO_RESTORE_RETRY_DELAY_MS = 1800;
 
 const SETTINGS_HTML = `
 <div id="prompt-keeper-settings" class="inline-drawer">
@@ -68,7 +66,6 @@ const SETTINGS_HTML = `
 // ========== State ==========
 
 let autoRestoreTimer = null;
-let autoRestoreRetryCountByChatId = {};
 
 /** 上一次处理的 chatId，避免同一聊天内重复触发恢复 */
 let lastHandledChatId = null;

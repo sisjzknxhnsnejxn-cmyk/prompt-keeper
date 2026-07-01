@@ -28,7 +28,7 @@ function onPromptKeeperAppReady() {
     ensurePromptKeeperUI('app_ready');
     schedulePromptKeeperUIEnsure('app_ready');
     requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
-    console.log(LOG_PREFIX, 'Plugin v3.0.0 initialized (APP_READY).');
+    console.log(LOG_PREFIX, 'Plugin v2.1.0 initialized (APP_READY).');
 }
 
 function destroyPromptKeeper(reason = 'manual') {
@@ -87,7 +87,6 @@ function destroyPromptKeeper(reason = 'manual') {
     unbindPromptKeeperEvents();
 
     lastHandledChatId = null;
-    autoRestoreRetryCountByChatId = {};
     justSavedChatId = null;
     observerPaused = false;
     dragListenersBound = false;
@@ -157,7 +156,7 @@ function _pkInit() {
         bindPromptKeeperEvent(eventSource, eventTypes.MAIN_API_CHANGED, onMainApiChanged);
     }
 
-    console.log(LOG_PREFIX, 'Plugin v3.0.0 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v2.1.0 loaded, waiting for APP_READY...');
 }
 
 _pkInit();
