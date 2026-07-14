@@ -105,37 +105,93 @@ function readPromptStatesFromDOM() {
 
 /**
  * 比较两个 promptOrder 是否在语义上一致。
- * 只比较 character_id / identifier / enabled，忽略未知字段。
+ * 只比较双方共有条目的相对顺序与存档条目的 enabled，忽略后来缝合的条目。
+ * 这样新增条目不会令自动恢复一直处于 dirty 状态。
  */
 function promptOrderEqual(a, b) {
     if (a === b) return true;
     if (!Array.isArray(a) || !Array.isArray(b)) return false;
-    if (a.length !== b.length) return false;
 
     // 元素类型不一致（如 DOM 回退的 string[] vs API 的 object[]），无法可靠比较，跳过
     if (a.length > 0 && b.length > 0 && typeof a[0] !== typeof b[0]) return true;
 
-    for (let i = 0; i < a.length; i++) {
-        const ai = a[i], bi = b[i];
-        if (ai === bi) continue;
-        if (typeof ai !== 'object' || typeof bi !== 'object' || ai === null || bi === null) return false;
+    // DOM 回退格式只有 identifier[]。当前列表允许含有存档后新增的条目，
+    // 因此只比较双方共有 identifier 的相对顺序。
+    if (a.length === 0 || b.length === 0 || typeof a[0] !== 'object') {
+        return sharedIdentifierOrderEqual(a, b);
+    }
 
-        if (String(ai.character_id ?? '') !== String(bi.character_id ?? '')) return false;
+    const matchedCurrentEntries = new Set();
+    for (const savedEntry of a) {
+        if (!savedEntry || typeof savedEntry !== 'object') continue;
 
-        if (!Array.isArray(ai.order) || !Array.isArray(bi.order)) {
-            if (ai.order !== bi.order) return false;
-            continue;
-        }
-        if (ai.order.length !== bi.order.length) return false;
-        for (let j = 0; j < ai.order.length; j++) {
-            const oj = ai.order[j], pj = bi.order[j];
-            if (oj === pj) continue;
-            if (typeof oj !== 'object' || typeof pj !== 'object' || oj === null || pj === null) return false;
-            if (oj.identifier !== pj.identifier) return false;
-            if (oj.enabled !== pj.enabled) return false;
+        const currentEntry = findPromptOrderEntryForComparison(b, savedEntry, matchedCurrentEntries);
+        // 对应的角色/默认顺序已不存在时没有可恢复对象，不把它持续判脏。
+        if (!currentEntry) continue;
+
+        matchedCurrentEntries.add(currentEntry);
+        if (!promptOrderEntryEqual(savedEntry, currentEntry)) return false;
+    }
+
+    return true;
+}
+
+function getPromptItemIdentifier(item) {
+    return item && typeof item === 'object' ? item.identifier : item;
+}
+
+function sharedIdentifierOrderEqual(savedItems, currentItems) {
+    if (!Array.isArray(savedItems) || !Array.isArray(currentItems)) return false;
+
+    const savedIdentifiers = savedItems.map(getPromptItemIdentifier).filter(Boolean);
+    const currentIdentifiers = currentItems.map(getPromptItemIdentifier).filter(Boolean);
+    const savedSet = new Set(savedIdentifiers);
+    const currentSet = new Set(currentIdentifiers);
+
+    const comparableSaved = savedIdentifiers.filter(identifier => currentSet.has(identifier));
+    const comparableCurrent = currentIdentifiers.filter(identifier => savedSet.has(identifier));
+
+    return comparableSaved.length === comparableCurrent.length
+        && comparableSaved.every((identifier, index) => identifier === comparableCurrent[index]);
+}
+
+function promptOrderEntryEqual(savedEntry, currentEntry) {
+    if (!Array.isArray(savedEntry.order) || !Array.isArray(currentEntry.order)) {
+        return savedEntry.order === currentEntry.order;
+    }
+
+    if (!sharedIdentifierOrderEqual(savedEntry.order, currentEntry.order)) return false;
+
+    const currentEnabled = new Map();
+    for (const item of currentEntry.order) {
+        const identifier = getPromptItemIdentifier(item);
+        if (identifier && item && typeof item === 'object') {
+            currentEnabled.set(identifier, item.enabled);
         }
     }
+
+    for (const savedItem of savedEntry.order) {
+        const identifier = getPromptItemIdentifier(savedItem);
+        if (!identifier || !currentEnabled.has(identifier) || !savedItem || typeof savedItem !== 'object') continue;
+        if (savedItem.enabled !== currentEnabled.get(identifier)) return false;
+    }
+
     return true;
+}
+
+function findPromptOrderEntryForComparison(currentOrder, savedEntry, excludedEntries) {
+    const savedKey = savedEntry.character_id !== undefined ? String(savedEntry.character_id) : '__default__';
+    const exact = currentOrder.find((entry) => {
+        if (!entry || typeof entry !== 'object' || excludedEntries.has(entry)) return false;
+        const currentKey = entry.character_id !== undefined ? String(entry.character_id) : '__default__';
+        return currentKey === savedKey;
+    });
+    if (exact) return exact;
+
+    return findCompatiblePromptOrderEntry(
+        currentOrder.filter(entry => !excludedEntries.has(entry)),
+        savedEntry,
+    );
 }
 
 /**
@@ -315,7 +371,8 @@ function findSavedPromptStateMismatches(savedState) {
 }
 
 /**
- * 智能合并 prompt_order：按 character_id 匹配，只更新 order 数组。
+ * 智能合并 prompt_order：按 character_id 匹配，只更新旧条目的相对顺序。
+ * 当前列表中不属于存档的条目视为后来缝合的条目，严格保留其当前数组位置。
  */
 function mergePromptOrder(currentOrder, savedOrder, skipped) {
     if (!Array.isArray(currentOrder) || !Array.isArray(savedOrder)) return;
@@ -343,29 +400,59 @@ function mergePromptOrder(currentOrder, savedOrder, skipped) {
 
         if (!Array.isArray(savedEntry.order) || !Array.isArray(currentEntry.order)) continue;
 
-        const currentOrderMap = new Map(currentEntry.order.map(item => [item.identifier, item]));
-        const newOrder = [];
-
-        for (const savedItem of savedEntry.order) {
-            const identifier = typeof savedItem === 'object' ? savedItem.identifier : savedItem;
-            if (currentOrderMap.has(identifier)) {
-                const currentItem = currentOrderMap.get(identifier);
-                if (typeof savedItem === 'object' && savedItem.enabled !== undefined) {
-                    currentItem.enabled = savedItem.enabled;
-                }
-                newOrder.push(currentItem);
-                currentOrderMap.delete(identifier);
-            } else {
-                if (identifier) skipped.push(identifier);
-            }
-        }
-
-        for (const [, item] of currentOrderMap) {
-            newOrder.push(item);
-        }
-
-        currentEntry.order = newOrder;
+        currentEntry.order = restoreSavedOrderKeepingNewSlots(
+            currentEntry.order,
+            savedEntry.order,
+            skipped,
+            true,
+        );
     }
+}
+
+/**
+ * 在不移动新增条目槽位的前提下，恢复存档条目的相对顺序。
+ *
+ * 例：存档 [A,B,C]，当前 [C,X,A,B]，结果 [A,X,B,C]。
+ * X 是存档中不存在的缝合条目，始终留在当前索引 1。
+ */
+function restoreSavedOrderKeepingNewSlots(currentItems, savedItems, skipped, copySavedEnabled = false) {
+    if (!Array.isArray(currentItems) || !Array.isArray(savedItems)) return currentItems;
+
+    const currentQueues = new Map();
+    for (const item of currentItems) {
+        const identifier = getPromptItemIdentifier(item);
+        if (!identifier) continue;
+        if (!currentQueues.has(identifier)) currentQueues.set(identifier, []);
+        currentQueues.get(identifier).push(item);
+    }
+
+    const restoredItems = [];
+    const restoredIdentifiers = new Set();
+    for (const savedItem of savedItems) {
+        const identifier = getPromptItemIdentifier(savedItem);
+        if (!identifier) continue;
+
+        const queue = currentQueues.get(identifier);
+        if (!queue || queue.length === 0) {
+            if (skipped && !skipped.includes(identifier)) skipped.push(identifier);
+            continue;
+        }
+
+        const currentItem = queue.shift();
+        if (copySavedEnabled && savedItem && typeof savedItem === 'object'
+            && currentItem && typeof currentItem === 'object' && savedItem.enabled !== undefined) {
+            currentItem.enabled = savedItem.enabled;
+        }
+        restoredItems.push(currentItem);
+        restoredIdentifiers.add(identifier);
+    }
+
+    let restoredIndex = 0;
+    return currentItems.map((item) => {
+        const identifier = getPromptItemIdentifier(item);
+        if (!identifier || !restoredIdentifiers.has(identifier)) return item;
+        return restoredItems[restoredIndex++] ?? item;
+    });
 }
 
 function findCompatiblePromptOrderEntry(currentOrder, savedEntry) {
@@ -404,24 +491,7 @@ function applyOrderFromIdentifierList(oaiSettings, savedOrder, currentIdentifier
 
     for (const entry of oaiSettings.prompt_order) {
         if (!entry.order || !Array.isArray(entry.order)) continue;
-
-        const currentOrderMap = new Map(entry.order.map((item) => [item.identifier, item]));
-        const newOrder = [];
-
-        for (const identifier of savedOrder) {
-            if (currentOrderMap.has(identifier)) {
-                newOrder.push(currentOrderMap.get(identifier));
-                currentOrderMap.delete(identifier);
-            } else {
-                if (identifier) skipped.push(identifier);
-            }
-        }
-
-        for (const [, item] of currentOrderMap) {
-            newOrder.push(item);
-        }
-
-        entry.order = newOrder;
+        entry.order = restoreSavedOrderKeepingNewSlots(entry.order, savedOrder, skipped);
     }
 }
 
@@ -463,7 +533,3 @@ function applyPromptStatesDOM(savedPrompts, skipped) {
 }
 
 // ========== Prompt Manager UI Refresh ==========
-
-
-
-

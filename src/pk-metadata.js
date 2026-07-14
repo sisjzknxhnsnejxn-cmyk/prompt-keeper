@@ -326,7 +326,23 @@ function getAutoRestoreDelay() {
     return mobile ? Math.max(baseDelay, 2200) : baseDelay;
 }
 
-async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
+function scheduleAutoRestoreRetry(chatId, reason) {
+    if (getCtx().chatId !== chatId || !isPluginEnabled() || !isAutoRestoreEnabled()) return;
+
+    const retryCount = autoRestoreRetryCountByChatId[chatId] || 0;
+    if (retryCount >= AUTO_RESTORE_MAX_RETRIES) {
+        delete autoRestoreRetryCountByChatId[chatId];
+        console.warn(LOG_PREFIX, `Auto-restore stopped after ${retryCount} retries for chat ${chatId} (${reason}).`);
+        return;
+    }
+
+    const nextRetry = retryCount + 1;
+    autoRestoreRetryCountByChatId[chatId] = nextRetry;
+    console.warn(LOG_PREFIX, `Auto-restore retry ${nextRetry}/${AUTO_RESTORE_MAX_RETRIES} scheduled for chat ${chatId} (${reason}).`);
+    scheduleRestoreForCurrentChat(`retry_${nextRetry}`, AUTO_RESTORE_RETRY_DELAY_MS);
+}
+
+async function scheduleRestoreForCurrentChat(source = 'chat_changed', delayOverride = null) {
     if (!isPluginEnabled()) return;
 
     const ctx = getCtx();
@@ -335,6 +351,7 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
     if (newChatId !== lastHandledChatId) {
         justSavedChatId = null;
         lastHandledChatId = newChatId;
+        autoRestoreRetryCountByChatId = {};
     }
 
     if (autoRestoreTimer) {
@@ -348,7 +365,7 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
         return;
     }
 
-    const totalDelay = getAutoRestoreDelay();
+    const totalDelay = delayOverride == null ? getAutoRestoreDelay() : Math.max(0, delayOverride);
 
     autoRestoreTimer = setTimeout(async () => {
         autoRestoreTimer = null;
@@ -364,19 +381,32 @@ async function scheduleRestoreForCurrentChat(source = 'chat_changed') {
         const contextReady = await waitForChatContext(newChatId);
         if (!contextReady || getCtx().chatId !== newChatId) {
             console.warn(LOG_PREFIX, `Auto-restore cancelled: chat context not ready for ${newChatId}.`);
+            if (getCtx().chatId === newChatId) scheduleAutoRestoreRetry(newChatId, 'context_not_ready');
             return;
         }
 
         const hasSave = hasSavedState();
         requestAnimationFrame(() => updateStatusDisplay(hasSave, getSavedAt()));
 
-        if (hasSave && isAutoRestoreEnabled()) {
-            if (justSavedChatId === newChatId) {
-                console.debug(LOG_PREFIX, 'Auto-restore skipped: just saved in this chat, protection active.');
-                return;
-            }
-            console.log(LOG_PREFIX, `Auto-restore triggered for chat: ${newChatId}`);
-            await restoreStatesFromMetadata(true, null, { autoRestore: true });
+        if (!hasSave || !isAutoRestoreEnabled()) {
+            delete autoRestoreRetryCountByChatId[newChatId];
+            return;
+        }
+
+        if (justSavedChatId === newChatId) {
+            delete autoRestoreRetryCountByChatId[newChatId];
+            console.debug(LOG_PREFIX, 'Auto-restore skipped: just saved in this chat, protection active.');
+            return;
+        }
+
+        console.log(LOG_PREFIX, `Auto-restore triggered for chat: ${newChatId}`);
+        const restored = await restoreStatesFromMetadata(true, null, { autoRestore: true });
+        if (getCtx().chatId !== newChatId) return;
+
+        if (restored) {
+            delete autoRestoreRetryCountByChatId[newChatId];
+        } else {
+            scheduleAutoRestoreRetry(newChatId, 'restore_failed');
         }
     }, totalDelay);
 
@@ -406,8 +436,6 @@ function onMainApiChanged() {
 }
 
 // ========== UI ==========
-
-
 
 
 

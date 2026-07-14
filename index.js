@@ -2,7 +2,7 @@
  * Prompt Keeper - SillyTavern Plugin loader
  *
  * @author sisjzknxhnsnejxn-cmyk
- * @version 2.1.0
+ * @version 2.1.1
  * @license MIT
  */
 
@@ -15,13 +15,21 @@
     const LEGACY_LOADED_KEY = '__promptKeeperLoaded';
     const PLUGIN_FOLDER = 'prompt-keeper';
     const SCRIPT_LOAD_TIMEOUT_MS = 15000;
+    const RELOAD_GUARD_KEY = '__promptKeeperReloadPromise';
+    const REFRESH_GUARD_KEY = 'promptKeeperUpdateRefreshAttempted';
 
     const previousState = window[LOADER_STATE_KEY];
     let baseUrl = null;
 
     window.PromptKeeperReload = async function PromptKeeperReload() {
         console.info('[PromptKeeper] 正在热重载插件文件；无需刷新页面或重启 SillyTavern 后端。');
-        await loadPromptKeeperRuntime({ force: true });
+        if (!window[RELOAD_GUARD_KEY]) {
+            window[RELOAD_GUARD_KEY] = loadPromptKeeperRuntime({ force: true })
+                .finally(() => {
+                    window[RELOAD_GUARD_KEY] = null;
+                });
+        }
+        return window[RELOAD_GUARD_KEY];
     };
 
     const scriptNames = [
@@ -35,6 +43,10 @@
         'pk-ui.js',
         'pk-settings-panel.js',
         'pk-main.js',
+    ];
+
+    const styleNames = [
+        '../style.css',
     ];
 
     const getCurrentScriptUrl = () => {
@@ -100,6 +112,23 @@
         document.querySelectorAll('script[data-prompt-keeper-part]').forEach((script) => script.remove());
     };
 
+    const ensureRuntimeStyles = (cacheBust) => {
+        for (const name of styleNames) {
+            const styleId = `prompt-keeper-style-${name.replace(/[^a-z0-9_-]/gi, '-')}`;
+            const styleUrl = new URL(name, baseUrl);
+            styleUrl.searchParams.set('pk', cacheBust);
+            let link = document.getElementById(styleId);
+            if (!link) {
+                link = document.createElement('link');
+                link.id = styleId;
+                link.rel = 'stylesheet';
+                link.dataset.promptKeeperStyle = name;
+                document.head.appendChild(link);
+            }
+            link.href = styleUrl.toString();
+        }
+    };
+
     const destroyCurrentRuntime = () => {
         const runtime = window.PromptKeeper;
         if (runtime && typeof runtime.destroy === 'function') {
@@ -110,6 +139,23 @@
             }
         }
         removeLegacyScriptTags();
+    };
+
+    const refreshPageOnceAfterFailedUpdate = (error) => {
+        try {
+            if (sessionStorage.getItem(REFRESH_GUARD_KEY) === '1') {
+                console.error('[PromptKeeper] 热重载和自动刷新后的加载均失败，已停止刷新以避免循环。', error);
+                return;
+            }
+            sessionStorage.setItem(REFRESH_GUARD_KEY, '1');
+        } catch (_) {
+            // sessionStorage 不可用时不自动刷新，避免无法设置防循环标记。
+            console.error('[PromptKeeper] 热重载失败，且无法设置自动刷新防循环标记。', error);
+            return;
+        }
+
+        console.warn('[PromptKeeper] 热重载失败，将自动刷新页面一次作为兜底。', error);
+        setTimeout(() => window.location.reload(), 250);
     };
 
     async function loadPromptKeeperRuntime(options = {}) {
@@ -126,7 +172,7 @@
         }
 
         baseUrl = getExtensionBaseUrl();
-        const cacheBust = `v=2.1.0&t=${Date.now()}`;
+        const cacheBust = `v=2.1.1&t=${Date.now()}`;
 
         window[LOADER_STATE_KEY] = {
             status: 'loading',
@@ -141,20 +187,17 @@
             parts.push(await fetchScript(name, cacheBust));
         }
 
-        if (force) {
-            destroyCurrentRuntime();
-        }
-
         const runtimeId = `pk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const footer = `
 ;window.PromptKeeper = Object.assign(window.PromptKeeper || {}, {
     id: ${JSON.stringify(runtimeId)},
-    version: '2.1.0',
+    version: '2.1.1',
     loadedAt: Date.now(),
     baseUrl: ${JSON.stringify(baseUrl)},
     reload: window.PromptKeeperReload,
     destroy: typeof destroyPromptKeeper === 'function' ? destroyPromptKeeper : function () {},
     init: typeof _pkInit === 'function' ? _pkInit : null,
+    activateAfterLateLoad: typeof activatePromptKeeperAfterLateLoad === 'function' ? activatePromptKeeperAfterLateLoad : null,
     updateStatusDisplay: typeof updateStatusDisplay === 'function' ? updateStatusDisplay : null,
     hasSavedState: typeof hasSavedState === 'function' ? hasSavedState : null,
 });
@@ -170,7 +213,20 @@
 });
 `;
 
-        Function(`"use strict";\n${parts.join('\n')}\n${footer}`)();
+        // 先编译所有新版脚本；语法错误时保留仍可工作的旧运行时。
+        const runtimeFactory = Function(`"use strict";\n${parts.join('\n')}\n${footer}`);
+
+        if (force) {
+            destroyCurrentRuntime();
+        }
+
+        runtimeFactory();
+        ensureRuntimeStyles(cacheBust);
+
+        // 更新扩展时 SillyTavern 的 APP_READY 已经触发过，必须主动补做初始化。
+        if (force && window.PromptKeeper && typeof window.PromptKeeper.activateAfterLateLoad === 'function') {
+            window.PromptKeeper.activateAfterLateLoad();
+        }
 
         window[LOADER_STATE_KEY] = {
             status: 'loaded',
@@ -179,13 +235,16 @@
             hotReload: force,
         };
         window[LEGACY_LOADED_KEY] = true;
+        try {
+            sessionStorage.removeItem(REFRESH_GUARD_KEY);
+        } catch (_) {}
         console.debug('[PromptKeeper] All scripts loaded from:', baseUrl);
         return window.PromptKeeper;
     }
 
     if (previousState && previousState.status === 'loaded') {
         console.info('[PromptKeeper] Loader re-executed; hot-reloading updated plugin files automatically.');
-        loadPromptKeeperRuntime({ force: true }).catch((error) => {
+        window.PromptKeeperReload().catch((error) => {
             window[LOADER_STATE_KEY] = {
                 status: 'failed',
                 failedAt: Date.now(),
@@ -194,6 +253,7 @@
             };
             window[LEGACY_LOADED_KEY] = false;
             console.error('[PromptKeeper]', error);
+            refreshPageOnceAfterFailedUpdate(error);
         });
         return;
     }

@@ -28,7 +28,18 @@ function onPromptKeeperAppReady() {
     ensurePromptKeeperUI('app_ready');
     schedulePromptKeeperUIEnsure('app_ready');
     requestAnimationFrame(() => updateStatusDisplay(hasSavedState(), getSavedAt()));
-    console.log(LOG_PREFIX, 'Plugin v2.1.0 initialized (APP_READY).');
+    console.log(LOG_PREFIX, 'Plugin v2.1.1 initialized (APP_READY).');
+}
+
+/**
+ * SillyTavern 更新扩展时会重新执行 index.js，但 APP_READY 通常早已发出。
+ * 由加载器在热重载完成后调用此函数，立即补做只会执行一次的就绪初始化。
+ */
+function activatePromptKeeperAfterLateLoad() {
+    if (!promptKeeperEventHandlersBound) {
+        _pkInit();
+    }
+    onPromptKeeperAppReady();
 }
 
 function destroyPromptKeeper(reason = 'manual') {
@@ -87,6 +98,7 @@ function destroyPromptKeeper(reason = 'manual') {
     unbindPromptKeeperEvents();
 
     lastHandledChatId = null;
+    autoRestoreRetryCountByChatId = {};
     justSavedChatId = null;
     observerPaused = false;
     dragListenersBound = false;
@@ -156,7 +168,7 @@ function _pkInit() {
         bindPromptKeeperEvent(eventSource, eventTypes.MAIN_API_CHANGED, onMainApiChanged);
     }
 
-    console.log(LOG_PREFIX, 'Plugin v2.1.0 loaded, waiting for APP_READY...');
+    console.log(LOG_PREFIX, 'Plugin v2.1.1 loaded, waiting for APP_READY...');
 }
 
 _pkInit();
