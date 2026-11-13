@@ -89,6 +89,8 @@ export function bindIOSModalViewportAndScrollLock($backdrop, scrollableSelector 
             } catch (_) {}
         }
     };
+}
+
 /**
  * 打开极简槽位名称输入弹窗
  * @param {string} title 标题
@@ -434,5 +436,3 @@ export function openConfirmModal(message = '确认删除？') {
     });
 }
 
-
-}

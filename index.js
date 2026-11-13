@@ -11,6 +11,7 @@
 
 (function loadPromptKeeperExtension() {
     const PLUGIN_FOLDER = 'prompt-keeper';
+    const PLUGIN_VERSION = '2.2.1';
     const LOADER_STATE_KEY = '__promptKeeperLoaderState';
 
     function resolveExtensionRootUrl() {
@@ -53,16 +54,12 @@
         if (typeof document === 'undefined' || !document.head) return;
         try {
             const hrefUrl = new URL('style.css', rootUrl);
-            if (cacheBust) {
-                hrefUrl.searchParams.set('pk', cacheBust);
-            }
+            hrefUrl.searchParams.set('v', cacheBust || PLUGIN_VERSION);
             const existingLink = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find(
                 (link) => link.href && link.href.includes(`/${PLUGIN_FOLDER}/style.css`)
             );
             if (existingLink) {
-                if (cacheBust) {
-                    existingLink.href = hrefUrl.toString();
-                }
+                existingLink.href = hrefUrl.toString();
                 return;
             }
             const link = document.createElement('link');
@@ -76,13 +73,11 @@
 
     async function bootPromptKeeperModule(forceReload = false) {
         const rootUrl = resolveExtensionRootUrl();
-        const cacheBust = forceReload ? `reload_${Date.now()}` : '';
+        const cacheBust = forceReload ? `${PLUGIN_VERSION}_${Date.now()}` : PLUGIN_VERSION;
         ensureStylesheetLoaded(rootUrl, cacheBust);
 
         const entryUrl = new URL('src/entry.js', rootUrl);
-        if (cacheBust) {
-            entryUrl.searchParams.set('t', cacheBust);
-        }
+        entryUrl.searchParams.set('v', cacheBust);
 
         const mod = await import(entryUrl.toString());
         if (mod && typeof mod.bootstrapPromptKeeper === 'function') {

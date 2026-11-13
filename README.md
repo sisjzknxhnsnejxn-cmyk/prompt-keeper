@@ -84,7 +84,7 @@ chatMetadata.promptKeeperState
 
 数据会跟随聊天文件保存。导出或迁移聊天时，只有在聊天元数据被完整保留的情况下，Prompt Keeper 配置才会一同保留。
 
-内部的 `promptKeeperState.version` 是存档结构版本，与插件发布版本 `2.2.0` 不是同一个概念。
+内部的 `promptKeeperState.version` 是存档结构版本，与插件发布版本 `2.2.1` 不是同一个概念。
 
 ## 系统要求
 
@@ -94,6 +94,11 @@ chatMetadata.promptKeeperState
 ## 更新日志
 
 完整更新历史也可查看 [CHANGELOG.md](CHANGELOG.md)。
+
+### v2.2.1
+
+- 修复 `src/ui/input-modal.js` 函数花括号闭合位置错位导致 ES Module 解析中断、使操作栏与扩展设置面板同时无法挂载的问题。
+- 为 `index.js` 的样式表与模块入口增加版本号缓存参数（`?v=2.2.1`），防止更新扩展后浏览器或移动端 Safari 命中旧缓存。
 
 ### v2.2.0
 

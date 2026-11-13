@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Keeper** are documented in this file.
 
+## [v2.2.1] - 2026-11-14
+
+### 🐛 Bug Fixes
+- 修复 `src/ui/input-modal.js` 中 `bindIOSModalViewportAndScrollLock` 函数闭合花括号错位导致的 ES Module `SyntaxError: Unexpected token 'export'`，恢复操作栏与扩展设置面板的正常挂载。
+- 为 `index.js` 加载 `style.css` 与 `src/entry.js` 默认附带版本号查询参数（`?v=2.2.1`），确保扩展更新后浏览器及 iOS Safari 立即拉取最新文件。
+
 ## [v2.2.0] - 2026-11-14
 
 ### ✨ UI 美学升级与极简重塑
