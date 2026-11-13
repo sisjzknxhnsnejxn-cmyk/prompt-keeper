@@ -1,127 +1,111 @@
 /**
- * Prompt Keeper (预设条目状态保持器) — SillyTavern Extension Entry
+ * Prompt Keeper (预设条目状态保持器) — SillyTavern Extension Universal Entry
  *
- * 采用原生 ES Modules 架构，按单一职责拆分到 src/ 各子模块：
- * - src/config/constants.js             常量与默认配置
- * - src/config/runtime-state.js         集中式可变运行时状态与销毁清理
- * - src/utils/st-context.js             SillyTavern 上下文与弹窗接口封装
- * - src/utils/format.js                 时间格式化、安全属性检查与名称规范化
- * - src/utils/dom-events.js             移动端触控防重与交互辅助
- * - src/core/settings.js                插件设置读写与校验
- * - src/core/state-migration.js         聊天元数据版本迁移与槽位查询
- * - src/core/prompt-reader.js           Prompt 条目开关与排序读取（API + DOM 回退）
- * - src/core/prompt-dirty-check.js      脏检查与顺序一致性对比算法
- * - src/core/prompt-applier.js          Prompt 状态与排序智能合并写回
- * - src/services/preset-service.js      预设读取、切换与 UI 稳定刷新
- * - src/services/slot-service.js        槽位保存、恢复、删除与默认槽位管理
- * - src/services/auto-restore-service.js 聊天切换自动恢复与重试调度
- * - src/ui/templates.js                 工具栏与设置面板 HTML 模板
- * - src/ui/status-bar.js                工具栏状态指示器渲染
- * - src/ui/slot-picker-modal.js         多槽位管理与恢复模态弹窗
- * - src/ui/settings-panel.js            扩展设置面板注入与事件绑定
- * - src/ui/ui-observer.js               工具栏注入、事件委托与 MutationObserver 保活
- * - src/app.js                          插件生命周期控制（初始化、事件绑定与热重载销毁）
+ * 同时兼容：
+ * 1. SillyTavern 原生 `<script type="module" src=".../index.js">`
+ * 2. 部分环境/旧版加载器的经典 `<script src=".../index.js">`
+ * 3. 在酒馆扩展管理界面点击“更新扩展”后免刷新热重载（自动破除 ES Module 缓存并重新挂载面板）
+ *
+ * 核心实现按单一职责拆分在 `src/` 各 ES Module 子模块中，由 `src/entry.js` 汇总导出。
  */
 
-import { destroyPromptKeeper, initPromptKeeper } from './src/app.js';
-import { LOG_PREFIX, PLUGIN_VERSION } from './src/config/constants.js';
-import { applyPromptStates } from './src/core/prompt-applier.js';
-import { checkDirtyState, promptOrderEqual } from './src/core/prompt-dirty-check.js';
-import { readPromptStates } from './src/core/prompt-reader.js';
-import {
-    isAutoRestoreEnabled,
-    isPluginEnabled,
-    loadPluginSettings,
-    savePluginSettings,
-} from './src/core/settings.js';
-import {
-    findSlotName,
-    getBestRestoreSlotName,
-    getDefaultSlotName,
-    getDefaultSlotState,
-    getSavedStateFromCurrentChat,
-    getSlotEntries,
-    migrateState,
-} from './src/core/state-migration.js';
-import { onChatChanged } from './src/services/auto-restore-service.js';
-import {
-    getCurrentPresetName,
-    refreshPromptManagerUI,
-    switchToPreset,
-} from './src/services/preset-service.js';
-import {
-    deleteSavedStates,
-    hasSavedState,
-    restoreStatesFromMetadata,
-    saveStatesToMetadata,
-    setDefaultSlot,
-} from './src/services/slot-service.js';
-import { injectSettingsPanel } from './src/ui/settings-panel.js';
-import { closeSlotPickerModal, openSlotPickerModal } from './src/ui/slot-picker-modal.js';
-import { updateStatusDisplay } from './src/ui/status-bar.js';
-import { injectUI, scheduleEnsurePromptKeeperUI } from './src/ui/ui-observer.js';
+(function loadPromptKeeperExtension() {
+    const PLUGIN_FOLDER = 'prompt-keeper';
+    const LOADER_STATE_KEY = '__promptKeeperLoaderState';
 
-/**
- * 启动或热重载插件实例
- */
-function bootstrapPromptKeeper() {
-    try {
-        if (
-            typeof window !== 'undefined' &&
-            window.PromptKeeper &&
-            typeof window.PromptKeeper.destroy === 'function'
-        ) {
-            window.PromptKeeper.destroy();
+    function resolveExtensionRootUrl() {
+        try {
+            if (typeof document !== 'undefined') {
+                if (document.currentScript && document.currentScript.src) {
+                    return new URL('./', document.currentScript.src).toString();
+                }
+
+                const scripts = Array.from(document.scripts || []);
+                const matchedScript = scripts.find((script) => {
+                    const src = script && script.src ? script.src : '';
+                    return (
+                        src.includes(`/${PLUGIN_FOLDER}/index.js`) ||
+                        (src.includes(PLUGIN_FOLDER) && src.includes('index.js'))
+                    );
+                });
+                if (matchedScript && matchedScript.src) {
+                    return new URL('./', matchedScript.src).toString();
+                }
+
+                const stScript = scripts.find((script) => {
+                    const src = script && script.src ? script.src : '';
+                    return src.includes('/scripts/extensions.js') || src.includes('/scripts/extensions/');
+                });
+                if (stScript && stScript.src) {
+                    const appRoot = new URL('../', stScript.src).toString();
+                    return new URL(`scripts/extensions/third-party/${PLUGIN_FOLDER}/`, appRoot).toString();
+                }
+            }
+        } catch (_) {}
+
+        if (typeof window !== 'undefined' && window.location && window.location.origin) {
+            return `${window.location.origin}/scripts/extensions/third-party/${PLUGIN_FOLDER}/`;
         }
-
-        if (typeof window !== 'undefined') {
-            window.PromptKeeper = {
-                version: PLUGIN_VERSION,
-                init: initPromptKeeper,
-                destroy: destroyPromptKeeper,
-                reload: bootstrapPromptKeeper,
-                saveStatesToMetadata,
-                restoreStatesFromMetadata,
-                deleteSavedStates,
-                setDefaultSlot,
-                hasSavedState,
-                readPromptStates,
-                applyPromptStates,
-                checkDirtyState,
-                promptOrderEqual,
-                migrateState,
-                getSlotEntries,
-                findSlotName,
-                getDefaultSlotState,
-                getDefaultSlotName,
-                getBestRestoreSlotName,
-                getSavedStateFromCurrentChat,
-                getCurrentPresetName,
-                switchToPreset,
-                refreshPromptManagerUI,
-                loadPluginSettings,
-                savePluginSettings,
-                isPluginEnabled,
-                isAutoRestoreEnabled,
-                updateStatusDisplay,
-                openSlotPickerModal,
-                closeSlotPickerModal,
-                injectUI,
-                injectSettingsPanel,
-                scheduleEnsurePromptKeeperUI,
-                onChatChanged,
-            };
-            window.PromptKeeperReload = bootstrapPromptKeeper;
-        }
-
-        initPromptKeeper(0);
-    } catch (error) {
-        console.error(LOG_PREFIX, 'Failed to initialize Prompt Keeper:', error);
+        return './';
     }
-}
 
-if (typeof window !== 'undefined') {
-    bootstrapPromptKeeper();
-}
+    function ensureStylesheetLoaded(rootUrl, cacheBust) {
+        if (typeof document === 'undefined' || !document.head) return;
+        try {
+            const hrefUrl = new URL('style.css', rootUrl);
+            if (cacheBust) {
+                hrefUrl.searchParams.set('pk', cacheBust);
+            }
+            const existingLink = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find(
+                (link) => link.href && link.href.includes(`/${PLUGIN_FOLDER}/style.css`)
+            );
+            if (existingLink) {
+                if (cacheBust) {
+                    existingLink.href = hrefUrl.toString();
+                }
+                return;
+            }
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.type = 'text/css';
+            link.href = hrefUrl.toString();
+            link.dataset.promptKeeperStyle = 'true';
+            document.head.appendChild(link);
+        } catch (_) {}
+    }
 
-export { bootstrapPromptKeeper, initPromptKeeper, destroyPromptKeeper };
+    async function bootPromptKeeperModule(forceReload = false) {
+        const rootUrl = resolveExtensionRootUrl();
+        const cacheBust = forceReload ? `reload_${Date.now()}` : '';
+        ensureStylesheetLoaded(rootUrl, cacheBust);
+
+        const entryUrl = new URL('src/entry.js', rootUrl);
+        if (cacheBust) {
+            entryUrl.searchParams.set('t', cacheBust);
+        }
+
+        const mod = await import(entryUrl.toString());
+        if (mod && typeof mod.bootstrapPromptKeeper === 'function') {
+            return mod.bootstrapPromptKeeper();
+        }
+        return null;
+    }
+
+    if (typeof window !== 'undefined') {
+        const prevState = window[LOADER_STATE_KEY];
+        window.PromptKeeperReload = () => bootPromptKeeperModule(true);
+
+        const isHotReload = Boolean(prevState && prevState.loaded);
+        window[LOADER_STATE_KEY] = { loading: true, updatedAt: Date.now() };
+
+        bootPromptKeeperModule(isHotReload)
+            .then(() => {
+                window[LOADER_STATE_KEY] = { loaded: true, updatedAt: Date.now() };
+            })
+            .catch((error) => {
+                window[LOADER_STATE_KEY] = { loaded: false, error: String(error), updatedAt: Date.now() };
+                console.error('[PromptKeeper] Failed to load ES module entry:', error);
+            });
+    }
+})();
+

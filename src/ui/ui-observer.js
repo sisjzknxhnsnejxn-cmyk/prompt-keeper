@@ -28,6 +28,7 @@ import {
     updateTouchMove,
 } from '../utils/dom-events.js';
 import { handleDeleteClick, handleRestoreClick } from './slot-picker-modal.js';
+import { injectSettingsPanel } from './settings-panel.js';
 import { updateStatusDisplay } from './status-bar.js';
 import { buildPromptKeeperBarHTML } from './templates.js';
 
@@ -35,6 +36,9 @@ export function findPromptManagerContainer() {
     if (typeof jQuery === 'undefined') return null;
 
     const primarySelectors = [
+        '#quick_prompts_container',
+        '#quickPromptEditor',
+        '#quick-prompts-inline-drawer',
         '#completion_prompt_manager_list',
         '#prompt_manager_list',
         '.prompt_manager_list',
@@ -46,9 +50,25 @@ export function findPromptManagerContainer() {
         if ($el.length > 0) return $el;
     }
 
+    let $quickPromptDrawer = null;
+    jQuery('.inline-drawer-header').each(function () {
+        if ($quickPromptDrawer) return;
+        const text = jQuery(this).text().trim();
+        if (/快速提示词|Quick Prompt|Prompt Editor/i.test(text)) {
+            const $drawer = jQuery(this).closest('.inline-drawer');
+            if ($drawer.length > 0) {
+                $quickPromptDrawer = $drawer.first();
+            }
+        }
+    });
+    if ($quickPromptDrawer && $quickPromptDrawer.length > 0) {
+        return $quickPromptDrawer;
+    }
+
     const fallbackSelectors = [
-        '#quick_prompts_container',
         '#top_p_block',
+        '[data-param="top_p"]',
+        '#range_block_top_p',
         '#ai_response_configuration',
         '#openai_settings',
         '#left-nav-panel .scrollableInner',
@@ -242,9 +262,18 @@ export function injectUI() {
         const $bar = jQuery(buildPromptKeeperBarHTML());
 
         if (
-            $container.is('#completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list')
+            $container.is(
+                '#quick_prompts_container, #quickPromptEditor, #quick-prompts-inline-drawer, .inline-drawer, #completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
+            )
         ) {
             $container.before($bar);
+        } else if ($container.is('#top_p_block, [data-param="top_p"], #range_block_top_p')) {
+            const $block = $container.closest('.range-block, .range_block, .completions_block_inner');
+            if ($block.length > 0) {
+                $block.after($bar);
+            } else {
+                $container.after($bar);
+            }
         } else {
             $container.prepend($bar);
         }
@@ -282,6 +311,10 @@ export function tryInjectUI(attempt = 0) {
 }
 
 export function scheduleEnsurePromptKeeperUI(reason = 'event') {
+    try {
+        injectSettingsPanel();
+    } catch (_) {}
+
     if (!isPluginEnabled()) return;
 
     clearUIEnsureTimers();
@@ -289,6 +322,9 @@ export function scheduleEnsurePromptKeeperUI(reason = 'event') {
     for (const delay of UI_ENSURE_DELAYS_MS) {
         const timer = setTimeout(() => {
             runtimeState.uiEnsureTimers = runtimeState.uiEnsureTimers.filter((item) => item !== timer);
+            try {
+                injectSettingsPanel();
+            } catch (_) {}
             if (!isPluginEnabled()) return;
             const injected = injectUI();
             if (injected) {
@@ -306,8 +342,14 @@ export function ensurePCUIWatchdog() {
     if (runtimeState.pcUIWatchdogTimer) return;
 
     runtimeState.pcUIWatchdogTimer = setInterval(() => {
-        if (!isPluginEnabled() || runtimeState.observerPaused) return;
+        if (runtimeState.observerPaused) return;
         if (typeof document !== 'undefined' && document.hidden) return;
+
+        try {
+            injectSettingsPanel();
+        } catch (_) {}
+
+        if (!isPluginEnabled()) return;
 
         const $container = findPromptManagerContainer();
         if (!$container || $container.length === 0) return;

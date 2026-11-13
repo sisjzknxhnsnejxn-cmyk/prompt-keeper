@@ -7,7 +7,7 @@ import { resetRuntimeState, runtimeState } from './config/runtime-state.js';
 import { isPluginEnabled, loadPluginSettings } from './core/settings.js';
 import { onChatChanged, onUserPresetChanged } from './services/auto-restore-service.js';
 import { hasSavedState } from './services/slot-service.js';
-import { injectSettingsPanel } from './ui/settings-panel.js';
+import { clearSettingsRetryTimer, injectSettingsPanel, tryInjectSettingsPanel } from './ui/settings-panel.js';
 import { closeSlotPickerModal } from './ui/slot-picker-modal.js';
 import { updateStatusDisplay } from './ui/status-bar.js';
 import {
@@ -48,6 +48,7 @@ export function unbindPromptKeeperEventListeners() {
 }
 
 export function destroyPromptKeeper() {
+    clearSettingsRetryTimer();
     unbindPromptKeeperEventListeners();
     unbindPromptKeeperButtonDelegation();
     closeSlotPickerModal();
@@ -83,20 +84,26 @@ export function initPromptKeeper(attempt = 0) {
 
     const { eventSource, event_types } = ctx;
 
-    const handleAppReady = () => {
-        if (runtimeState.promptKeeperAppReadyHandled) return;
-        runtimeState.promptKeeperAppReadyHandled = true;
-
+    const ensureUIMounted = (source = 'init') => {
         loadPluginSettings();
-        injectSettingsPanel();
+        tryInjectSettingsPanel(0);
         bindPromptKeeperButtonDelegation();
 
         if (isPluginEnabled()) {
             tryInjectUI(0);
-            scheduleEnsurePromptKeeperUI('appReady');
+            scheduleEnsurePromptKeeperUI(source);
             startUIObserver();
             ensurePCUIWatchdog();
+        }
+    };
 
+    const handleAppReady = () => {
+        const isFirstReady = !runtimeState.promptKeeperAppReadyHandled;
+        runtimeState.promptKeeperAppReadyHandled = true;
+
+        ensureUIMounted('appReady');
+
+        if (isFirstReady && isPluginEnabled()) {
             // 无论当前聊天是否已有存档，先记录当前 chatId，防止后续在同聊天保存+切预设+点正则重载时被误判为新聊天
             try {
                 const currentCtx = getCtxSafe();
@@ -116,7 +123,17 @@ export function initPromptKeeper(attempt = 0) {
     };
 
     registerEventSourceListener(eventSource, event_types.APP_READY, handleAppReady);
-    registerEventSourceListener(eventSource, event_types.CHAT_CHANGED, onChatChanged);
+    registerEventSourceListener(eventSource, event_types.CHAT_CHANGED, () => {
+        scheduleEnsurePromptKeeperUI('chatChanged');
+        onChatChanged();
+    });
+
+    if (event_types.CHAT_LOADED) {
+        registerEventSourceListener(eventSource, event_types.CHAT_LOADED, () => {
+            scheduleEnsurePromptKeeperUI('chatLoaded');
+            onChatChanged();
+        });
+    }
 
     if (event_types.SETTINGS_LOADED_AFTER) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED_AFTER, () => {
@@ -181,6 +198,13 @@ export function initPromptKeeper(attempt = 0) {
             });
     }
 
-    handleAppReady();
+    // 先尝试挂载一次（应对在 APP_READY 之后热重载或延迟加载的场景），
+    // 同时不锁死 promptKeeperAppReadyHandled，确保真正的 APP_READY 到来时还会再次挂载。
+    ensureUIMounted('init');
+    if (isPluginEnabled() && hasSavedState()) {
+        onChatChanged();
+    } else {
+        updateStatusDisplay();
+    }
     console.log(LOG_PREFIX, `Extension initialized (v${PLUGIN_VERSION}).`);
 }

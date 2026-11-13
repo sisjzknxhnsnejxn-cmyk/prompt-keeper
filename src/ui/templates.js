@@ -35,54 +35,54 @@ export function buildPromptKeeperBarHTML() {
 
 /**
  * 构建扩展设置面板 HTML
+ * 注意：根元素直接作为 .inline-drawer 挂载在 #extensions_settings2 下，
+ * 确保与酒馆原生折叠面板及第三方美化主题（圆角卡片列表）100% 兼容。
  */
 export function buildSettingsPanelHTML(settings) {
     return `
-<div id="prompt-keeper-settings" class="prompt-keeper-settings">
-    <div class="inline-drawer">
-        <div class="inline-drawer-toggle inline-drawer-header">
-            <b><i class="fa-solid fa-bookmark" style="margin-right:6px;"></i>Prompt Keeper 预设状态管理</b>
-            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+<div id="prompt-keeper-settings" class="inline-drawer prompt-keeper-settings">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b><i class="fa-solid fa-bookmark" style="margin-right:6px;"></i>Prompt Keeper 预设状态管理</b>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    </div>
+    <div class="inline-drawer-content">
+        <div class="pk-setting-row">
+            <label class="checkbox_label" for="pk-setting-enabled">
+                <input id="pk-setting-enabled" type="checkbox" ${settings.enabled ? 'checked' : ''} />
+                <span>启用插件</span>
+            </label>
+            <small class="pk-setting-hint">关闭后将隐藏工具栏并停止所有自动恢复</small>
         </div>
-        <div class="inline-drawer-content">
-            <div class="pk-setting-row">
-                <label class="checkbox_label" for="pk-setting-enabled">
-                    <input id="pk-setting-enabled" type="checkbox" ${settings.enabled ? 'checked' : ''} />
-                    <span>启用插件</span>
-                </label>
-                <small class="pk-setting-hint">关闭后将隐藏工具栏并停止所有自动恢复</small>
-            </div>
-            <div class="pk-setting-row">
-                <label class="checkbox_label" for="pk-setting-auto-restore">
-                    <input id="pk-setting-auto-restore" type="checkbox" ${settings.autoRestore ? 'checked' : ''} />
-                    <span>切换聊天时自动恢复</span>
-                </label>
-                <small class="pk-setting-hint">打开聊天时自动恢复该聊天保存的预设条目状态与顺序</small>
-            </div>
-            <div class="pk-setting-row">
-                <label class="checkbox_label" for="pk-setting-custom-save-name">
-                    <input id="pk-setting-custom-save-name" type="checkbox" ${settings.customSaveName ? 'checked' : ''} />
-                    <span>保存时自定义预设槽位名称</span>
-                </label>
-                <small class="pk-setting-hint">开启后点击“保存”会弹出输入框，可用自定义名称区分同一预设的不同条目组合</small>
-            </div>
-            <div class="pk-setting-row">
-                <label for="pk-setting-slot-theme">槽位选择弹窗配色</label>
-                <select id="pk-setting-slot-theme" class="text_pole">
-                    <option value="light" ${settings.slotPickerTheme !== 'dark' ? 'selected' : ''}>浅色护眼（米白卡片 + 深棕文字）</option>
-                    <option value="dark" ${settings.slotPickerTheme === 'dark' ? 'selected' : ''}>深色玻璃（跟随酒馆暗色风格）</option>
-                </select>
-                <small class="pk-setting-hint">切换“管理 / 恢复已保存预设槽位”弹窗的配色方案，方便在不同屏幕亮度和主题下清晰阅读</small>
-            </div>
-            <div class="pk-setting-row">
-                <label for="pk-setting-delay">自动恢复延迟 (毫秒)</label>
-                <input id="pk-setting-delay" type="number" class="text_pole" min="300" max="5000" step="100" value="${settings.autoRestoreDelay}" style="width:100px;" />
-                <small class="pk-setting-hint">切换聊天后等待多久再执行恢复，手机端建议 1000~2000ms</small>
-            </div>
-            <hr class="sysHR" />
-            <div class="pk-setting-footer">
-                <small>版本 v${PLUGIN_VERSION} · 支持保存条目开关、拖拽顺序与所属预设（每聊天最多 5 槽位）</small>
-            </div>
+        <div class="pk-setting-row">
+            <label class="checkbox_label" for="pk-setting-auto-restore">
+                <input id="pk-setting-auto-restore" type="checkbox" ${settings.autoRestore ? 'checked' : ''} />
+                <span>切换聊天时自动恢复</span>
+            </label>
+            <small class="pk-setting-hint">打开聊天时自动恢复该聊天保存的预设条目状态与顺序</small>
+        </div>
+        <div class="pk-setting-row">
+            <label class="checkbox_label" for="pk-setting-custom-save-name">
+                <input id="pk-setting-custom-save-name" type="checkbox" ${settings.customSaveName ? 'checked' : ''} />
+                <span>保存时自定义预设槽位名称</span>
+            </label>
+            <small class="pk-setting-hint">开启后点击“保存”会弹出输入框，可用自定义名称区分同一预设的不同条目组合</small>
+        </div>
+        <div class="pk-setting-row">
+            <label for="pk-setting-slot-theme">槽位选择弹窗配色</label>
+            <select id="pk-setting-slot-theme" class="text_pole">
+                <option value="light" ${settings.slotPickerTheme !== 'dark' ? 'selected' : ''}>浅色护眼（米白卡片 + 深棕文字）</option>
+                <option value="dark" ${settings.slotPickerTheme === 'dark' ? 'selected' : ''}>深色玻璃（跟随酒馆暗色风格）</option>
+            </select>
+            <small class="pk-setting-hint">切换“管理 / 恢复已保存预设槽位”弹窗的配色方案，方便在不同屏幕亮度和主题下清晰阅读</small>
+        </div>
+        <div class="pk-setting-row">
+            <label for="pk-setting-delay">自动恢复延迟 (毫秒)</label>
+            <input id="pk-setting-delay" type="number" class="text_pole" min="300" max="5000" step="100" value="${settings.autoRestoreDelay}" style="width:100px;" />
+            <small class="pk-setting-hint">切换聊天后等待多久再执行恢复，手机端建议 1000~2000ms</small>
+        </div>
+        <hr class="sysHR" />
+        <div class="pk-setting-footer">
+            <small>版本 v${PLUGIN_VERSION} · 支持保存条目开关、拖拽顺序与所属预设（每聊天最多 5 槽位）</small>
         </div>
     </div>
 </div>`;

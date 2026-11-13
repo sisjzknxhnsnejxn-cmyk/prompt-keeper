@@ -10,16 +10,22 @@ import { updateStatusDisplay } from './status-bar.js';
 import { buildSettingsPanelHTML } from './templates.js';
 import { ensurePCUIWatchdog, startUIObserver, tryInjectUI } from './ui-observer.js';
 
+let settingsRetryTimer = null;
+
 export function injectSettingsPanel() {
-    if (typeof jQuery === 'undefined') return;
-    if (jQuery('#prompt-keeper-settings').length > 0) return;
+    if (typeof jQuery === 'undefined') return false;
+    const $existing = jQuery('#prompt-keeper-settings');
+    if ($existing.length > 0 && typeof document !== 'undefined' && document.body && document.body.contains($existing[0])) {
+        return true;
+    }
 
     const $container = jQuery('#extensions_settings2, #extensions_settings').first();
     if ($container.length === 0) {
         console.debug(LOG_PREFIX, 'Extensions settings container not found yet.');
-        return;
+        return false;
     }
 
+    $existing.remove();
     const settings = loadPluginSettings();
     const html = buildSettingsPanelHTML(settings);
     $container.append(html);
@@ -91,4 +97,29 @@ export function injectSettingsPanel() {
     });
 
     console.log(LOG_PREFIX, 'Settings panel injected.');
+    return true;
+}
+
+export function clearSettingsRetryTimer() {
+    if (settingsRetryTimer) {
+        clearTimeout(settingsRetryTimer);
+        settingsRetryTimer = null;
+    }
+}
+
+export function tryInjectSettingsPanel(attempt = 0) {
+    clearSettingsRetryTimer();
+
+    if (injectSettingsPanel()) {
+        return true;
+    }
+
+    if (attempt < 25) {
+        const delay = attempt < 6 ? 350 : 800;
+        settingsRetryTimer = setTimeout(() => {
+            settingsRetryTimer = null;
+            tryInjectSettingsPanel(attempt + 1);
+        }, delay);
+    }
+    return false;
 }
