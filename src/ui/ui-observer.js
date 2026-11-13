@@ -32,8 +32,53 @@ import { injectSettingsPanel } from './settings-panel.js';
 import { updateStatusDisplay } from './status-bar.js';
 import { buildPromptKeeperBarHTML } from './templates.js';
 
+export function findPreferredPresetRow() {
+    if (typeof jQuery === 'undefined') return null;
+
+    const $exactRow = jQuery('#openai_api-presets > div:nth-child(1) > div.flex-container.flexNoGap').first();
+    if ($exactRow.length > 0) return $exactRow;
+
+    const $bySelect = jQuery('#settings_preset_openai').closest('div.flex-container.flexNoGap').first();
+    if ($bySelect.length > 0) return $bySelect;
+
+    return null;
+}
+
+export function ensureBarInPreferredPosition($bar) {
+    if (!$bar || !$bar.length || typeof jQuery === 'undefined') return false;
+
+    const $presetRow = findPreferredPresetRow();
+    if ($presetRow && $presetRow.length > 0) {
+        const rowEl = $presetRow[0];
+        const barEl = $bar[0];
+        if (rowEl && barEl && rowEl.nextElementSibling !== barEl) {
+            $presetRow.after($bar);
+            return true;
+        }
+        return false;
+    }
+
+    const $regexPanel = jQuery('#st-native-regex-panel').first();
+    if ($regexPanel.length > 0) {
+        const regexEl = $regexPanel[0];
+        const barEl = $bar[0];
+        if (regexEl && barEl && barEl.nextElementSibling !== regexEl) {
+            $regexPanel.before($bar);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 export function findPromptManagerContainer() {
     if (typeof jQuery === 'undefined') return null;
+
+    const $presetRow = findPreferredPresetRow();
+    if ($presetRow && $presetRow.length > 0) return $presetRow;
+
+    const $regexPanel = jQuery('#st-native-regex-panel').first();
+    if ($regexPanel.length > 0) return $regexPanel;
 
     const primarySelectors = [
         '#quick_prompts_container',
@@ -233,6 +278,7 @@ export function injectUI() {
 
     const $existingBar = jQuery('#prompt-keeper-bar');
     if ($existingBar.length > 0 && document.body && document.body.contains($existingBar[0])) {
+        ensureBarInPreferredPosition($existingBar);
         bindPromptKeeperButtonDelegation();
         bindDirectToolbarButtonEvents($existingBar);
         updateStatusDisplay();
@@ -260,8 +306,14 @@ export function injectUI() {
         jQuery('#prompt-keeper-bar').remove();
 
         const $bar = jQuery(buildPromptKeeperBarHTML());
+        const $presetRow = findPreferredPresetRow();
 
-        if (
+        if ($presetRow && $presetRow.length > 0) {
+            // 优先挂载在预设下拉选择器行正下方、#st-native-regex-panel（预设正则）正上方
+            $presetRow.after($bar);
+        } else if ($container.is('#st-native-regex-panel')) {
+            $container.before($bar);
+        } else if (
             $container.is(
                 '#quick_prompts_container, #quickPromptEditor, #quick-prompts-inline-drawer, .inline-drawer, #completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
             )
@@ -354,8 +406,13 @@ export function ensurePCUIWatchdog() {
         const $container = findPromptManagerContainer();
         if (!$container || $container.length === 0) return;
 
-        if (typeof jQuery !== 'undefined' && jQuery('#prompt-keeper-bar').length === 0) {
-            injectUI();
+        if (typeof jQuery !== 'undefined') {
+            const $bar = jQuery('#prompt-keeper-bar');
+            if ($bar.length === 0) {
+                injectUI();
+            } else {
+                ensureBarInPreferredPosition($bar);
+            }
         }
     }, PC_UI_WATCHDOG_INTERVAL_MS);
 }
@@ -394,7 +451,9 @@ export function startUIObserver() {
 
             runtimeState.observerRafId = requestAnimationFrame(() => {
                 runtimeState.observerRafId = null;
-                if (typeof jQuery !== 'undefined' && jQuery('#prompt-keeper-bar').length === 0) {
+                if (typeof jQuery === 'undefined') return;
+                const $existingBar = jQuery('#prompt-keeper-bar');
+                if ($existingBar.length === 0) {
                     const $container = findPromptManagerContainer();
                     if ($container) {
                         runtimeState.observerReinjectionCount++;
@@ -413,6 +472,8 @@ export function startUIObserver() {
                         }
                         injectUI();
                     }
+                } else {
+                    ensureBarInPreferredPosition($existingBar);
                 }
             });
         }, 350);
