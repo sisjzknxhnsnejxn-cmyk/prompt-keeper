@@ -8,6 +8,7 @@ import { isPluginEnabled, loadPluginSettings } from './core/settings.js';
 import { onChatChanged, onUserPresetChanged } from './services/auto-restore-service.js';
 import { hasSavedState } from './services/slot-service.js';
 import { clearSettingsRetryTimer, injectSettingsPanel, tryInjectSettingsPanel } from './ui/settings-panel.js';
+import { closeInputModal } from './ui/input-modal.js';
 import { closeSlotPickerModal } from './ui/slot-picker-modal.js';
 import { updateStatusDisplay } from './ui/status-bar.js';
 import {
@@ -51,6 +52,7 @@ export function destroyPromptKeeper() {
     clearSettingsRetryTimer();
     unbindPromptKeeperEventListeners();
     unbindPromptKeeperButtonDelegation();
+    closeInputModal();
     closeSlotPickerModal();
     resetRuntimeState();
 

@@ -3,6 +3,7 @@
  */
 
 import { CHAT_COMPLETION_API_ID } from '../config/constants.js';
+import { openConfirmModal, openSaveNameInputModal } from '../ui/input-modal.js';
 
 let cachedOpenAIModulePromise = null;
 
@@ -85,12 +86,18 @@ export function isMobileDevice(ctx = getCtxSafe()) {
 }
 
 /**
- * 弹出文本输入框：优先使用酒馆原生异步 Popup，回退到 window.prompt
+ * 弹出文本输入框：优先使用内置极简 iOS 适配弹窗，回退到酒馆原生 Popup 或 window.prompt
  * @param {string} message 提示标题/内容
  * @param {string} defaultValue 默认输入值
  * @returns {Promise<string|null>} 用户输入字符串，取消则返回 null
  */
 export async function showInputPopup(message, defaultValue = '') {
+    if (typeof jQuery !== 'undefined' && typeof document !== 'undefined') {
+        try {
+            return await openSaveNameInputModal('保存预设槽位', defaultValue);
+        } catch (_) {}
+    }
+
     const ctx = getCtxSafe();
     if (ctx && typeof ctx.callGenericPopup === 'function' && ctx.POPUP_TYPE && ctx.POPUP_TYPE.INPUT !== undefined) {
         try {
@@ -111,11 +118,17 @@ export async function showInputPopup(message, defaultValue = '') {
 }
 
 /**
- * 弹出确认对话框：优先使用酒馆原生异步 Popup，回退到 window.confirm
+ * 弹出确认对话框：优先使用内置极简 iOS 适配确认框，回退到酒馆原生异步 Popup 或 window.confirm
  * @param {string} message 确认提示信息
  * @returns {Promise<boolean>}
  */
 export async function showConfirmPopup(message) {
+    if (typeof jQuery !== 'undefined' && typeof document !== 'undefined') {
+        try {
+            return await openConfirmModal(message);
+        } catch (_) {}
+    }
+
     const ctx = getCtxSafe();
     if (ctx && typeof ctx.callGenericPopup === 'function' && ctx.POPUP_TYPE && ctx.POPUP_TYPE.CONFIRM !== undefined) {
         try {
