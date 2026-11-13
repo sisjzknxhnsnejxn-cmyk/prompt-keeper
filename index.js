@@ -1,280 +1,127 @@
 /**
- * Prompt Keeper - SillyTavern Plugin loader
+ * Prompt Keeper (预设条目状态保持器) — SillyTavern Extension Entry
  *
- * @author sisjzknxhnsnejxn-cmyk
- * @version 2.1.1
- * @license MIT
+ * 采用原生 ES Modules 架构，按单一职责拆分到 src/ 各子模块：
+ * - src/config/constants.js             常量与默认配置
+ * - src/config/runtime-state.js         集中式可变运行时状态与销毁清理
+ * - src/utils/st-context.js             SillyTavern 上下文与弹窗接口封装
+ * - src/utils/format.js                 时间格式化、安全属性检查与名称规范化
+ * - src/utils/dom-events.js             移动端触控防重与交互辅助
+ * - src/core/settings.js                插件设置读写与校验
+ * - src/core/state-migration.js         聊天元数据版本迁移与槽位查询
+ * - src/core/prompt-reader.js           Prompt 条目开关与排序读取（API + DOM 回退）
+ * - src/core/prompt-dirty-check.js      脏检查与顺序一致性对比算法
+ * - src/core/prompt-applier.js          Prompt 状态与排序智能合并写回
+ * - src/services/preset-service.js      预设读取、切换与 UI 稳定刷新
+ * - src/services/slot-service.js        槽位保存、恢复、删除与默认槽位管理
+ * - src/services/auto-restore-service.js 聊天切换自动恢复与重试调度
+ * - src/ui/templates.js                 工具栏与设置面板 HTML 模板
+ * - src/ui/status-bar.js                工具栏状态指示器渲染
+ * - src/ui/slot-picker-modal.js         多槽位管理与恢复模态弹窗
+ * - src/ui/settings-panel.js            扩展设置面板注入与事件绑定
+ * - src/ui/ui-observer.js               工具栏注入、事件委托与 MutationObserver 保活
+ * - src/app.js                          插件生命周期控制（初始化、事件绑定与热重载销毁）
  */
 
-(function loadPromptKeeperScripts() {
-    // SillyTavern 的部分设置页/正则页刷新会重新执行扩展入口。
-    // 为支持更新扩展后不刷新页面即可使用新版代码，入口层通过 fetch + Function
-    // 将拆分脚本放入同一个隔离作用域执行，避免重复注入 <script> 后触发
-    // “Identifier has already been declared”。
-    const LOADER_STATE_KEY = '__promptKeeperLoaderState';
-    const LEGACY_LOADED_KEY = '__promptKeeperLoaded';
-    const PLUGIN_FOLDER = 'prompt-keeper';
-    const SCRIPT_LOAD_TIMEOUT_MS = 15000;
-    const RELOAD_GUARD_KEY = '__promptKeeperReloadPromise';
-    const REFRESH_GUARD_KEY = 'promptKeeperUpdateRefreshAttempted';
+import { destroyPromptKeeper, initPromptKeeper } from './src/app.js';
+import { LOG_PREFIX, PLUGIN_VERSION } from './src/config/constants.js';
+import { applyPromptStates } from './src/core/prompt-applier.js';
+import { checkDirtyState, promptOrderEqual } from './src/core/prompt-dirty-check.js';
+import { readPromptStates } from './src/core/prompt-reader.js';
+import {
+    isAutoRestoreEnabled,
+    isPluginEnabled,
+    loadPluginSettings,
+    savePluginSettings,
+} from './src/core/settings.js';
+import {
+    findSlotName,
+    getBestRestoreSlotName,
+    getDefaultSlotName,
+    getDefaultSlotState,
+    getSavedStateFromCurrentChat,
+    getSlotEntries,
+    migrateState,
+} from './src/core/state-migration.js';
+import { onChatChanged } from './src/services/auto-restore-service.js';
+import {
+    getCurrentPresetName,
+    refreshPromptManagerUI,
+    switchToPreset,
+} from './src/services/preset-service.js';
+import {
+    deleteSavedStates,
+    hasSavedState,
+    restoreStatesFromMetadata,
+    saveStatesToMetadata,
+    setDefaultSlot,
+} from './src/services/slot-service.js';
+import { injectSettingsPanel } from './src/ui/settings-panel.js';
+import { closeSlotPickerModal, openSlotPickerModal } from './src/ui/slot-picker-modal.js';
+import { updateStatusDisplay } from './src/ui/status-bar.js';
+import { injectUI, scheduleEnsurePromptKeeperUI } from './src/ui/ui-observer.js';
 
-    const previousState = window[LOADER_STATE_KEY];
-    let baseUrl = null;
-
-    window.PromptKeeperReload = async function PromptKeeperReload() {
-        console.info('[PromptKeeper] 正在热重载插件文件；无需刷新页面或重启 SillyTavern 后端。');
-        if (!window[RELOAD_GUARD_KEY]) {
-            window[RELOAD_GUARD_KEY] = loadPromptKeeperRuntime({ force: true })
-                .finally(() => {
-                    window[RELOAD_GUARD_KEY] = null;
-                });
-        }
-        return window[RELOAD_GUARD_KEY];
-    };
-
-    const scriptNames = [
-        'pk-performance.js',
-        'pk-constants.js',
-        'pk-settings.js',
-        'pk-state.js',
-        'pk-prompt-state.js',
-        'pk-preset.js',
-        'pk-metadata.js',
-        'pk-ui.js',
-        'pk-settings-panel.js',
-        'pk-main.js',
-    ];
-
-    const styleNames = [
-        '../style.css',
-    ];
-
-    const getCurrentScriptUrl = () => {
-        if (document.currentScript && document.currentScript.src) {
-            return document.currentScript.src;
-        }
-
-        const scripts = Array.from(document.scripts || []);
-        const ownScript = scripts.find((script) => {
-            const src = script && script.src ? script.src : '';
-            return src.includes(`/${PLUGIN_FOLDER}/index.js`) || src.endsWith('/index.js') && src.includes(PLUGIN_FOLDER);
-        });
-
-        return ownScript && ownScript.src ? ownScript.src : '';
-    };
-
-    const getExtensionBaseUrl = () => {
-        const currentScriptUrl = getCurrentScriptUrl();
-        if (currentScriptUrl) {
-            return new URL('src/', currentScriptUrl).toString();
-        }
-
-        const extensionSettingsScript = Array.from(document.scripts || []).find((script) => {
-            const src = script && script.src ? script.src : '';
-            return src.includes('/scripts/extensions/') || src.includes('/scripts/extensions.js');
-        });
-
-        if (extensionSettingsScript && extensionSettingsScript.src) {
-            const appRoot = new URL('../', extensionSettingsScript.src).toString();
-            return new URL(`scripts/extensions/third-party/${PLUGIN_FOLDER}/src/`, appRoot).toString();
-        }
-
-        return new URL(`/scripts/extensions/third-party/${PLUGIN_FOLDER}/src/`, window.location.origin).toString();
-    };
-
-    const fetchScript = async (name, cacheBust) => {
-        const scriptUrl = new URL(name, baseUrl);
-        scriptUrl.searchParams.set('pk', cacheBust);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), SCRIPT_LOAD_TIMEOUT_MS);
-
-        try {
-            const response = await fetch(scriptUrl.toString(), {
-                cache: 'no-store',
-                signal: controller.signal,
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status} ${response.statusText}`);
-            }
-            return `\n//# sourceURL=${scriptUrl.toString()}\n${await response.text()}\n`;
-        } catch (error) {
-            if (error && error.name === 'AbortError') {
-                throw new Error('Timed out loading Prompt Keeper script: ' + name);
-            }
-            throw new Error('Failed to load Prompt Keeper script: ' + name + ' from ' + scriptUrl.toString() + ' (' + (error && error.message ? error.message : error) + ')');
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    };
-
-    const removeLegacyScriptTags = () => {
-        document.querySelectorAll('script[data-prompt-keeper-part]').forEach((script) => script.remove());
-    };
-
-    const ensureRuntimeStyles = (cacheBust) => {
-        for (const name of styleNames) {
-            const styleId = `prompt-keeper-style-${name.replace(/[^a-z0-9_-]/gi, '-')}`;
-            const styleUrl = new URL(name, baseUrl);
-            styleUrl.searchParams.set('pk', cacheBust);
-            let link = document.getElementById(styleId);
-            if (!link) {
-                link = document.createElement('link');
-                link.id = styleId;
-                link.rel = 'stylesheet';
-                link.dataset.promptKeeperStyle = name;
-                document.head.appendChild(link);
-            }
-            link.href = styleUrl.toString();
-        }
-    };
-
-    const destroyCurrentRuntime = () => {
-        const runtime = window.PromptKeeper;
-        if (runtime && typeof runtime.destroy === 'function') {
-            try {
-                runtime.destroy('reload');
-            } catch (error) {
-                console.warn('[PromptKeeper] Runtime destroy failed during reload:', error);
-            }
-        }
-        removeLegacyScriptTags();
-    };
-
-    const refreshPageOnceAfterFailedUpdate = (error) => {
-        try {
-            if (sessionStorage.getItem(REFRESH_GUARD_KEY) === '1') {
-                console.error('[PromptKeeper] 热重载和自动刷新后的加载均失败，已停止刷新以避免循环。', error);
-                return;
-            }
-            sessionStorage.setItem(REFRESH_GUARD_KEY, '1');
-        } catch (_) {
-            // sessionStorage 不可用时不自动刷新，避免无法设置防循环标记。
-            console.error('[PromptKeeper] 热重载失败，且无法设置自动刷新防循环标记。', error);
-            return;
-        }
-
-        console.warn('[PromptKeeper] 热重载失败，将自动刷新页面一次作为兜底。', error);
-        setTimeout(() => window.location.reload(), 250);
-    };
-
-    async function loadPromptKeeperRuntime(options = {}) {
-        const force = options.force === true;
-        const state = window[LOADER_STATE_KEY];
-
-        if (!force && state && state.status === 'loaded') {
-            console.debug('[PromptKeeper] Runtime load skipped: already loaded. Run window.PromptKeeperReload() to hot-reload updated files.');
-            return window.PromptKeeper;
-        }
-        if (!force && state && state.status === 'loading') {
-            console.debug('[PromptKeeper] Runtime load skipped: another load is in progress.');
-            return window.PromptKeeper;
-        }
-
-        baseUrl = getExtensionBaseUrl();
-        const cacheBust = `v=2.1.1&t=${Date.now()}`;
-
-        window[LOADER_STATE_KEY] = {
-            status: 'loading',
-            startedAt: Date.now(),
-            baseUrl,
-            hotReload: force,
-        };
-        window[LEGACY_LOADED_KEY] = false;
-
-        const parts = [];
-        for (const name of scriptNames) {
-            parts.push(await fetchScript(name, cacheBust));
-        }
-
-        const runtimeId = `pk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const footer = `
-;window.PromptKeeper = Object.assign(window.PromptKeeper || {}, {
-    id: ${JSON.stringify(runtimeId)},
-    version: '2.1.1',
-    loadedAt: Date.now(),
-    baseUrl: ${JSON.stringify(baseUrl)},
-    reload: window.PromptKeeperReload,
-    destroy: typeof destroyPromptKeeper === 'function' ? destroyPromptKeeper : function () {},
-    init: typeof _pkInit === 'function' ? _pkInit : null,
-    activateAfterLateLoad: typeof activatePromptKeeperAfterLateLoad === 'function' ? activatePromptKeeperAfterLateLoad : null,
-    updateStatusDisplay: typeof updateStatusDisplay === 'function' ? updateStatusDisplay : null,
-    hasSavedState: typeof hasSavedState === 'function' ? hasSavedState : null,
-});
-[
-    'loadSettingsPanel', 'tryInjectUI', 'startUIObserver', 'updateStatusDisplay',
-    'hasSavedState', 'getSavedAt', 'onChatChanged', 'onChatLoaded',
-    'onPresetChanged', 'onMainApiChanged', 'saveStatesToMetadata',
-    'restoreStatesFromMetadata', 'deleteStateFromMetadata', 'showSlotPicker'
-].forEach(function (name) {
+/**
+ * 启动或热重载插件实例
+ */
+function bootstrapPromptKeeper() {
     try {
-        if (typeof eval(name) === 'function') window[name] = eval(name);
-    } catch (_) {}
-});
-`;
-
-        // 先编译所有新版脚本；语法错误时保留仍可工作的旧运行时。
-        const runtimeFactory = Function(`"use strict";\n${parts.join('\n')}\n${footer}`);
-
-        if (force) {
-            destroyCurrentRuntime();
+        if (
+            typeof window !== 'undefined' &&
+            window.PromptKeeper &&
+            typeof window.PromptKeeper.destroy === 'function'
+        ) {
+            window.PromptKeeper.destroy();
         }
 
-        runtimeFactory();
-        ensureRuntimeStyles(cacheBust);
-
-        // 更新扩展时 SillyTavern 的 APP_READY 已经触发过，必须主动补做初始化。
-        if (force && window.PromptKeeper && typeof window.PromptKeeper.activateAfterLateLoad === 'function') {
-            window.PromptKeeper.activateAfterLateLoad();
+        if (typeof window !== 'undefined') {
+            window.PromptKeeper = {
+                version: PLUGIN_VERSION,
+                init: initPromptKeeper,
+                destroy: destroyPromptKeeper,
+                reload: bootstrapPromptKeeper,
+                saveStatesToMetadata,
+                restoreStatesFromMetadata,
+                deleteSavedStates,
+                setDefaultSlot,
+                hasSavedState,
+                readPromptStates,
+                applyPromptStates,
+                checkDirtyState,
+                promptOrderEqual,
+                migrateState,
+                getSlotEntries,
+                findSlotName,
+                getDefaultSlotState,
+                getDefaultSlotName,
+                getBestRestoreSlotName,
+                getSavedStateFromCurrentChat,
+                getCurrentPresetName,
+                switchToPreset,
+                refreshPromptManagerUI,
+                loadPluginSettings,
+                savePluginSettings,
+                isPluginEnabled,
+                isAutoRestoreEnabled,
+                updateStatusDisplay,
+                openSlotPickerModal,
+                closeSlotPickerModal,
+                injectUI,
+                injectSettingsPanel,
+                scheduleEnsurePromptKeeperUI,
+                onChatChanged,
+            };
+            window.PromptKeeperReload = bootstrapPromptKeeper;
         }
 
-        window[LOADER_STATE_KEY] = {
-            status: 'loaded',
-            loadedAt: Date.now(),
-            baseUrl,
-            hotReload: force,
-        };
-        window[LEGACY_LOADED_KEY] = true;
-        try {
-            sessionStorage.removeItem(REFRESH_GUARD_KEY);
-        } catch (_) {}
-        console.debug('[PromptKeeper] All scripts loaded from:', baseUrl);
-        return window.PromptKeeper;
+        initPromptKeeper(0);
+    } catch (error) {
+        console.error(LOG_PREFIX, 'Failed to initialize Prompt Keeper:', error);
     }
+}
 
-    if (previousState && previousState.status === 'loaded') {
-        console.info('[PromptKeeper] Loader re-executed; hot-reloading updated plugin files automatically.');
-        window.PromptKeeperReload().catch((error) => {
-            window[LOADER_STATE_KEY] = {
-                status: 'failed',
-                failedAt: Date.now(),
-                baseUrl,
-                error: error && error.message ? error.message : String(error),
-            };
-            window[LEGACY_LOADED_KEY] = false;
-            console.error('[PromptKeeper]', error);
-            refreshPageOnceAfterFailedUpdate(error);
-        });
-        return;
-    }
+if (typeof window !== 'undefined') {
+    bootstrapPromptKeeper();
+}
 
-    if (previousState && previousState.status === 'loading') {
-        console.debug('[PromptKeeper] Loader skipped: already loading.');
-        return;
-    }
-
-    loadPromptKeeperRuntime()
-        .then(() => {
-            // 状态已在 loadPromptKeeperRuntime 内更新。
-        })
-        .catch((error) => {
-            window[LOADER_STATE_KEY] = {
-                status: 'failed',
-                failedAt: Date.now(),
-                baseUrl,
-                error: error && error.message ? error.message : String(error),
-            };
-            window[LEGACY_LOADED_KEY] = false;
-            console.error('[PromptKeeper]', error);
-        });
-})();
+export { bootstrapPromptKeeper, initPromptKeeper, destroyPromptKeeper };

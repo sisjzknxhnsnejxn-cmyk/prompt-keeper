@@ -522,6 +522,284 @@
 }
 
 /* Settings panel */
+#prompt-keeper-settings .pk-setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 0;
+}
+
+#prompt-keeper-settings .pk-setting-hint {
+    font-size: 0.82em;
+    line-height: 1.4;
+    color: var(--SmartThemeEmColor, rgba(200, 200, 200, 0.78));
+    opacity: 0.88;
+}
+
+#prompt-keeper-settings .pk-setting-footer {
+    padding: 4px 0 2px;
+    opacity: 0.82;
+}
+
+/* Multi-slot picker modal (#prompt-keeper-slot-modal) */
+#prompt-keeper-slot-modal.pk-slot-modal-backdrop {
+    --pk-overlay-bg: rgba(8, 10, 16, 0.56);
+    --pk-card-bg: #1e222d;
+    --pk-card-text: #eef2ff;
+    --pk-card-muted: rgba(226, 232, 248, 0.72);
+    --pk-card-border: rgba(255, 255, 255, 0.14);
+    --pk-card-shadow: 0 18px 48px rgba(0, 0, 0, 0.52);
+    --pk-item-bg: rgba(255, 255, 255, 0.05);
+    --pk-item-hover-bg: rgba(138, 180, 255, 0.14);
+    --pk-item-active-bg: rgba(138, 180, 255, 0.22);
+    --pk-item-border: rgba(255, 255, 255, 0.12);
+    --pk-accent: var(--SmartThemeQuoteColor, #8ab4ff);
+    --pk-danger: #f87171;
+    --pk-danger-bg: rgba(248, 113, 113, 0.14);
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100svh;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    background: var(--pk-overlay-bg);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    overscroll-behavior: contain;
+    touch-action: manipulation;
+}
+
+#prompt-keeper-slot-modal.pk-slot-theme-light {
+    --pk-overlay-bg: rgba(24, 24, 28, 0.42);
+    --pk-card-bg: #faf6f0;
+    --pk-card-text: #2c221e;
+    --pk-card-muted: rgba(68, 52, 44, 0.75);
+    --pk-card-border: rgba(120, 96, 82, 0.24);
+    --pk-card-shadow: 0 18px 44px rgba(28, 20, 16, 0.24);
+    --pk-item-bg: rgba(255, 255, 255, 0.86);
+    --pk-item-hover-bg: rgba(180, 138, 96, 0.14);
+    --pk-item-active-bg: rgba(180, 138, 96, 0.24);
+    --pk-item-border: rgba(120, 96, 82, 0.22);
+    --pk-accent: #8c5830;
+    --pk-danger: #c83e3b;
+    --pk-danger-bg: rgba(200, 62, 59, 0.12);
+}
+
+#prompt-keeper-slot-modal .pk-slot-modal {
+    width: min(480px, 100%);
+    max-width: 100%;
+    max-height: calc(100vh - max(24px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 16px)));
+    max-height: calc(100dvh - max(24px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 16px)));
+    max-height: calc(100svh - max(24px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 16px)));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    border: 1px solid var(--pk-card-border);
+    background: var(--pk-card-bg);
+    color: var(--pk-card-text);
+    box-shadow: var(--pk-card-shadow);
+    overflow: hidden;
+    contain: layout paint;
+}
+
+.pk-slot-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.pk-slot-modal-title {
+    margin: 0;
+    font-size: 1.02em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--pk-card-text);
+    overflow-wrap: anywhere;
+}
+
+.pk-slot-modal-subtitle {
+    margin: 4px 0 0;
+    font-size: 0.85em;
+    line-height: 1.45;
+    color: var(--pk-card-muted);
+    overflow-wrap: anywhere;
+}
+
+.pk-slot-close-btn {
+    flex: 0 0 auto;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--pk-item-border);
+    background: var(--pk-item-bg);
+    color: var(--pk-card-text);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#prompt-keeper-slot-modal .pk-slot-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    cursor: default;
+}
+
+.pk-slot-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.pk-slot-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.pk-slot-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 0.74em;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.pk-slot-badge-current {
+    background: rgba(74, 222, 128, 0.16);
+    color: #16a34a;
+    border: 1px solid rgba(74, 222, 128, 0.38);
+}
+
+#prompt-keeper-slot-modal.pk-slot-theme-dark .pk-slot-badge-current {
+    color: #86efac;
+}
+
+.pk-slot-badge-default {
+    background: rgba(250, 204, 21, 0.18);
+    color: #b45309;
+    border: 1px solid rgba(250, 204, 21, 0.42);
+}
+
+#prompt-keeper-slot-modal.pk-slot-theme-dark .pk-slot-badge-default {
+    color: #fde047;
+}
+
+.pk-slot-meta {
+    font-size: 0.8em;
+    line-height: 1.4;
+    color: var(--pk-card-muted);
+    overflow-wrap: anywhere;
+}
+
+.pk-slot-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.pk-slot-action-btn,
+.pk-slot-clear-all-btn,
+.pk-slot-cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 38px;
+    padding: 6px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--pk-item-border);
+    background: var(--pk-item-bg);
+    color: var(--pk-card-text);
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background-color 0.14s ease, border-color 0.14s ease, opacity 0.12s ease;
+}
+
+.pk-slot-action-btn i,
+.pk-slot-action-btn span,
+.pk-slot-clear-all-btn i,
+.pk-slot-cancel-btn i {
+    pointer-events: none;
+}
+
+.pk-slot-action-btn:hover,
+.pk-slot-cancel-btn:hover {
+    background: var(--pk-item-hover-bg);
+    border-color: var(--pk-accent);
+}
+
+.pk-slot-action-btn:active,
+.pk-slot-clear-all-btn:active,
+.pk-slot-cancel-btn:active {
+    opacity: 0.82;
+}
+
+.pk-slot-action-danger,
+.pk-slot-clear-all-btn {
+    color: var(--pk-danger);
+    border-color: rgba(248, 113, 113, 0.35);
+    background: var(--pk-danger-bg);
+}
+
+.pk-slot-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--pk-item-border);
+}
+
+@media (max-width: 480px) {
+    #prompt-keeper-slot-modal.pk-slot-modal-backdrop {
+        align-items: flex-end;
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    #prompt-keeper-slot-modal .pk-slot-modal {
+        width: 100%;
+        border-radius: 18px;
+        padding: 15px 14px;
+    }
+
+    .pk-slot-action-btn,
+    .pk-slot-clear-all-btn,
+    .pk-slot-cancel-btn,
+    .pk-slot-close-btn {
+        min-height: 44px;
+    }
+}
+
 #prompt-keeper-settings .settings_section {
     padding: 4px 0;
 }
