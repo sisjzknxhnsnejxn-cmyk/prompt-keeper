@@ -4,7 +4,7 @@
 
 import { MAX_SLOTS_PER_CHAT } from '../config/constants.js';
 import { runtimeState } from '../config/runtime-state.js';
-import { loadPluginSettings } from '../core/settings.js';
+import { loadPluginSettings, savePluginSettings } from '../core/settings.js';
 import {
     findSlotName,
     getDefaultSlotName,
@@ -25,9 +25,15 @@ import {
     shouldHandleInteraction,
     shouldSuppressSyntheticClick,
 } from '../utils/dom-events.js';
-import { getSlotMetaLabel, hasOwnSlot } from '../utils/format.js';
+import { hasOwnSlot } from '../utils/format.js';
 
 const MODAL_OPEN_GUARD_MS = 350;
+
+function renderThemeToggleContent(isLight) {
+    return isLight
+        ? '<i class="fa-solid fa-sun"></i><span>日间</span>'
+        : '<i class="fa-solid fa-moon"></i><span>夜间</span>';
+}
 
 export function closeSlotPickerModal() {
     if (typeof runtimeState.modalEscapeCleanup === 'function') {
@@ -59,71 +65,75 @@ export function openSlotPickerModal(mode = 'restore') {
     const matchedSlotName = currentPreset ? findSlotName(savedState, currentPreset) : null;
     const defaultSlotName = getDefaultSlotName(savedState);
     const settings = loadPluginSettings();
-    const themeClass =
-        settings.slotPickerTheme === 'light' ? 'pk-slot-theme-light' : 'pk-slot-theme-dark';
+    let isLightTheme = settings.slotPickerTheme !== 'dark';
+    const themeClass = isLightTheme ? 'pk-slot-theme-light' : 'pk-slot-theme-dark';
 
     const $backdrop = jQuery(
         `<div id="prompt-keeper-slot-modal" class="pk-slot-modal-backdrop pk-modal-overlay ${themeClass}" role="dialog" aria-modal="true"></div>`
     );
     const $dialog = jQuery('<div class="pk-slot-modal pk-modal-card"></div>');
-    const titleText = mode === 'delete' ? '选择要删除的预设槽位' : '管理 / 恢复已保存预设槽位';
-    const subtitleText = `当前聊天已保存 ${entries.length}/${MAX_SLOTS_PER_CHAT} 个槽位${currentPreset ? ` · 当前预设：${currentPreset}` : ''}`;
+    const titleText = mode === 'delete' ? '管理预设槽位' : '预设槽位';
 
     const $header = jQuery('<div class="pk-slot-modal-header"></div>');
-    const $headerText = jQuery('<div></div>');
-    $headerText.append(jQuery('<div class="pk-slot-modal-title"></div>').text(titleText));
-    $headerText.append(jQuery('<div class="pk-slot-modal-subtitle"></div>').text(subtitleText));
-    const $closeBtn = jQuery(
-        '<button type="button" class="menu_button pk-slot-close-btn" title="关闭"><i class="fa-solid fa-xmark"></i></button>'
+    const $headerTitleWrap = jQuery('<div class="pk-slot-modal-title-wrap"></div>');
+    $headerTitleWrap.append(jQuery('<div class="pk-slot-modal-title"></div>').text(titleText));
+    $headerTitleWrap.append(
+        jQuery('<span class="pk-slot-count-pill"></span>').text(
+            `${entries.length}/${MAX_SLOTS_PER_CHAT}`
+        )
     );
-    $header.append($headerText, $closeBtn);
+
+    const $headerTools = jQuery('<div class="pk-slot-modal-tools"></div>');
+    const $themeBtn = jQuery(
+        `<button type="button" class="pk-slot-theme-btn" title="切换日间 / 夜间模式">${renderThemeToggleContent(isLightTheme)}</button>`
+    );
+    const $closeBtn = jQuery(
+        '<button type="button" class="pk-slot-close-btn" title="关闭"><i class="fa-solid fa-xmark"></i></button>'
+    );
+    $headerTools.append($themeBtn, $closeBtn);
+    $header.append($headerTitleWrap, $headerTools);
 
     const $list = jQuery('<div class="pk-slot-list"></div>');
 
-    for (const [slotName, slot] of entries) {
-        const count = slot && slot.prompts ? Object.keys(slot.prompts).length : 0;
-        const hasOrder = Boolean(slot && slot.promptOrder);
-        const metaLabel = getSlotMetaLabel(slotName, slot);
+    for (const [slotName] of entries) {
         const isCurrentPreset = matchedSlotName === slotName;
         const isDefaultSlot = defaultSlotName === slotName;
 
         const $item = jQuery('<div class="pk-slot-item"></div>');
-        const $info = jQuery('<div class="pk-slot-info"></div>');
         const $nameRow = jQuery('<div class="pk-slot-name-row"></div>');
         $nameRow.append(jQuery('<span class="pk-slot-name"></span>').text(slotName));
 
+        const $badges = jQuery('<div class="pk-slot-badges"></div>');
         if (isCurrentPreset) {
-            $nameRow.append(
-                jQuery('<span class="pk-slot-badge pk-slot-badge-current">当前预设</span>')
+            $badges.append(
+                jQuery('<span class="pk-slot-badge pk-slot-badge-current">当前</span>')
             );
         }
         if (isDefaultSlot) {
-            $nameRow.append(
-                jQuery('<span class="pk-slot-badge pk-slot-badge-default">自动恢复默认</span>')
+            $badges.append(
+                jQuery('<span class="pk-slot-badge pk-slot-badge-default">默认</span>')
             );
         }
+        if ($badges.children().length > 0) {
+            $nameRow.append($badges);
+        }
 
-        const $meta = jQuery('<div class="pk-slot-meta"></div>').text(
-            `${count} 个条目开关${hasOrder ? ' + 排列顺序' : ''} · ${metaLabel}`
-        );
-        $info.append($nameRow, $meta);
-
-        const $actions = jQuery('<div class="pk-slot-item-actions"></div>');
+        const $actions = jQuery('<div class="pk-slot-actions"></div>');
 
         const $restoreSlotBtn = jQuery(
-            '<button type="button" class="menu_button prompt-keeper-btn pk-slot-action-btn" title="切换到该槽位所属预设并完整恢复条目状态"><i class="fa-solid fa-rotate-left"></i><span>恢复</span></button>'
+            '<button type="button" class="pk-slot-action-btn pk-slot-action-primary" title="恢复"><i class="fa-solid fa-rotate-left"></i><span>恢复</span></button>'
         );
         $restoreSlotBtn.attr('data-pk-slot-action', 'restore').attr('data-pk-slot-name', slotName);
 
         const $applyCurrentBtn = jQuery(
-            '<button type="button" class="menu_button prompt-keeper-btn pk-slot-action-btn" title="不切换当前预设，仅将该槽位的同名条目开关与顺序套用到当前预设"><i class="fa-solid fa-wand-magic-sparkles"></i><span>仅套用条目</span></button>'
+            '<button type="button" class="pk-slot-action-btn" title="仅套用条目"><i class="fa-solid fa-wand-magic-sparkles"></i><span>仅套用条目</span></button>'
         );
         $applyCurrentBtn
             .attr('data-pk-slot-action', 'apply-current')
             .attr('data-pk-slot-name', slotName);
 
         const $defaultBtn = jQuery(
-            `<button type="button" class="menu_button prompt-keeper-btn pk-slot-action-btn" ${isDefaultSlot ? 'disabled' : ''} title="设为打开此聊天时自动恢复的默认槽位"><i class="fa-solid fa-star"></i><span>${isDefaultSlot ? '默认' : '设默认'}</span></button>`
+            `<button type="button" class="pk-slot-action-btn ${isDefaultSlot ? 'pk-slot-action-muted' : ''}" ${isDefaultSlot ? 'disabled' : ''} title="设为默认"><i class="fa-solid fa-star"></i><span>${isDefaultSlot ? '已默认' : '设默认'}</span></button>`
         );
         if (!isDefaultSlot) {
             $defaultBtn
@@ -132,22 +142,21 @@ export function openSlotPickerModal(mode = 'restore') {
         }
 
         const $deleteSlotBtn = jQuery(
-            '<button type="button" class="menu_button prompt-keeper-btn prompt-keeper-btn-danger pk-slot-action-btn" title="删除此槽位"><i class="fa-solid fa-trash-can"></i></button>'
+            '<button type="button" class="pk-slot-action-btn pk-slot-action-danger pk-slot-action-icon" title="删除"><i class="fa-solid fa-trash-can"></i></button>'
         );
         $deleteSlotBtn.attr('data-pk-slot-action', 'delete').attr('data-pk-slot-name', slotName);
 
         $actions.append($restoreSlotBtn, $applyCurrentBtn, $defaultBtn, $deleteSlotBtn);
-        $item.append($info, $actions);
+        $item.append($nameRow, $actions);
         $list.append($item);
     }
 
-
     const $footer = jQuery('<div class="pk-slot-modal-footer"></div>');
     const $clearAllBtn = jQuery(
-        '<button type="button" class="menu_button prompt-keeper-btn prompt-keeper-btn-danger"><i class="fa-solid fa-broom"></i><span>清空全部槽位</span></button>'
+        '<button type="button" class="pk-slot-clear-all-btn"><i class="fa-solid fa-trash-can"></i><span>清空全部</span></button>'
     );
     const $cancelBtn = jQuery(
-        '<button type="button" class="menu_button prompt-keeper-btn"><span>关闭</span></button>'
+        '<button type="button" class="pk-slot-cancel-btn"><span>关闭</span></button>'
     );
 
     const modalInteractionEvents = pkGetButtonEventTypes().join(' ');
@@ -166,6 +175,26 @@ export function openSlotPickerModal(mode = 'restore') {
         }
         return false;
     };
+
+    $themeBtn.on(modalInteractionEvents, function (e) {
+        if (isGhostEventFromModalTrigger(e)) return;
+        if (isTouchScrollGesture(runtimeState, e)) return;
+        if (shouldSuppressSyntheticClick(this, e.type)) return;
+        markTouchHandledForSyntheticClick(this, e.type);
+        if (!shouldHandleInteraction(this)) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        isLightTheme = !isLightTheme;
+        const s = loadPluginSettings();
+        s.slotPickerTheme = isLightTheme ? 'light' : 'dark';
+        savePluginSettings();
+
+        $backdrop
+            .removeClass('pk-slot-theme-light pk-slot-theme-dark')
+            .addClass(isLightTheme ? 'pk-slot-theme-light' : 'pk-slot-theme-dark');
+        $themeBtn.html(renderThemeToggleContent(isLightTheme));
+    });
 
     $list.on(modalInteractionEvents, '[data-pk-slot-action]', async function (e) {
         if (isGhostEventFromModalTrigger(e)) return;

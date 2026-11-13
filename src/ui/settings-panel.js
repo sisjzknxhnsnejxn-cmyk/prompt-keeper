@@ -70,22 +70,6 @@ export function injectSettingsPanel() {
         savePluginSettings();
     });
 
-    jQuery('#pk-setting-slot-theme').on('change', function () {
-        const s = loadPluginSettings();
-        const theme = String(jQuery(this).val() || 'dark');
-        s.slotPickerTheme = theme === 'light' ? 'light' : 'dark';
-        savePluginSettings();
-
-        const $modal = jQuery('#prompt-keeper-slot-modal');
-        if ($modal.length > 0) {
-            $modal
-                .removeClass('pk-slot-theme-dark pk-slot-theme-light')
-                .addClass(
-                    s.slotPickerTheme === 'light' ? 'pk-slot-theme-light' : 'pk-slot-theme-dark'
-                );
-        }
-    });
-
     jQuery('#pk-setting-delay').on('change', function () {
         const s = loadPluginSettings();
         let val = parseInt(String(jQuery(this).val()), 10);
