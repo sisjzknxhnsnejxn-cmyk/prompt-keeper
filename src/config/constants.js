@@ -4,7 +4,7 @@
  */
 
 export const EXTENSION_NAME = 'prompt-keeper';
-export const PLUGIN_VERSION = '2.2.1';
+export const PLUGIN_VERSION = '2.2.2';
 export const LOG_PREFIX = '[PromptKeeper]';
 export const METADATA_KEY = 'promptKeeperState';
 export const SETTINGS_KEY = 'promptKeeperPluginSettings';

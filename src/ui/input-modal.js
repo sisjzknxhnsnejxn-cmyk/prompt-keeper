@@ -21,8 +21,8 @@ let activeInputModalCleanup = null;
 
 function renderThemeIcon(isLight) {
     return isLight
-        ? '<i class="fa-solid fa-sun"></i>'
-        : '<i class="fa-solid fa-moon"></i>';
+        ? '<i class="fa-solid fa-sun"></i><span>日间</span>'
+        : '<i class="fa-solid fa-moon"></i><span>夜间</span>';
 }
 
 export function closeInputModal() {
@@ -281,7 +281,7 @@ export function openSaveNameInputModal(title = '命名预设槽位', defaultValu
 
         const $tools = jQuery('<div class="pk-slot-modal-tools"></div>');
         const $themeBtn = jQuery(
-            `<button type="button" class="pk-slot-theme-btn pk-icon-only-btn" title="切换日间 / 夜间模式">${renderThemeIcon(isLightTheme)}</button>`
+            `<button type="button" class="pk-slot-theme-btn" title="切换日间 / 夜间模式">${renderThemeIcon(isLightTheme)}</button>`
         );
         const $closeBtn = jQuery(
             '<button type="button" class="pk-slot-close-btn" title="关闭" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>'
@@ -508,10 +508,13 @@ export function openConfirmModal(message = '确认删除？') {
         );
 
         const $tools = jQuery('<div class="pk-slot-modal-tools"></div>');
+        const $themeBtn = jQuery(
+            `<button type="button" class="pk-slot-theme-btn" title="切换日间 / 夜间模式">${renderThemeIcon(isLightTheme)}</button>`
+        );
         const $closeBtn = jQuery(
             '<button type="button" class="pk-slot-close-btn" title="关闭" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>'
         );
-        $tools.append($closeBtn);
+        $tools.append($themeBtn, $closeBtn);
         $header.append($titleWrap, $tools);
 
         const $body = jQuery('<div class="pk-confirm-modal-body"></div>').text(message);
@@ -543,6 +546,25 @@ export function openConfirmModal(message = '确认删除？') {
             }
             return false;
         };
+
+        $themeBtn.on(modalEvents, function (e) {
+            if (isGhost(e)) return;
+            if (isTouchScrollGesture(runtimeState, e)) return;
+            if (shouldSuppressSyntheticClick(this, e.type)) return;
+            markTouchHandledForSyntheticClick(this, e.type);
+            if (!shouldHandleInteraction(this)) return;
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+
+            isLightTheme = !isLightTheme;
+            const s = loadPluginSettings();
+            s.slotPickerTheme = isLightTheme ? 'light' : 'dark';
+            savePluginSettings();
+            $backdrop
+                .removeClass('pk-slot-theme-light pk-slot-theme-dark')
+                .addClass(isLightTheme ? 'pk-slot-theme-light' : 'pk-slot-theme-dark');
+            $themeBtn.html(renderThemeIcon(isLightTheme));
+        });
 
         $confirmBtn.on(modalEvents, function (e) {
             if (isGhost(e)) return;

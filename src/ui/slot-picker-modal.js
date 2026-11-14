@@ -36,8 +36,8 @@ const INLINE_CONFIRM_TIMEOUT_MS = 3000;
 
 function renderThemeToggleContent(isLight) {
     return isLight
-        ? '<i class="fa-solid fa-sun"></i>'
-        : '<i class="fa-solid fa-moon"></i>';
+        ? '<i class="fa-solid fa-sun"></i><span>日间</span>'
+        : '<i class="fa-solid fa-moon"></i><span>夜间</span>';
 }
 
 export function closeSlotPickerModal() {
@@ -90,7 +90,7 @@ export function openSlotPickerModal(mode = 'restore') {
 
     const $headerTools = jQuery('<div class="pk-slot-modal-tools"></div>');
     const $themeBtn = jQuery(
-        `<button type="button" class="pk-slot-theme-btn pk-icon-only-btn" title="切换日间 / 夜间模式">${renderThemeToggleContent(isLightTheme)}</button>`
+        `<button type="button" class="pk-slot-theme-btn" title="切换日间 / 夜间模式">${renderThemeToggleContent(isLightTheme)}</button>`
     );
     const $closeBtn = jQuery(
         '<button type="button" class="pk-slot-close-btn" title="关闭" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>'
