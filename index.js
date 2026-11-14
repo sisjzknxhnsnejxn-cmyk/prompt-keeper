@@ -11,7 +11,7 @@
 
 (function loadPromptKeeperExtension() {
     const PLUGIN_FOLDER = 'prompt-keeper';
-    const PLUGIN_VERSION = '2.2.1';
+    const PLUGIN_VERSION = '2.2.3';
     const LOADER_STATE_KEY = '__promptKeeperLoaderState';
 
     function resolveExtensionRootUrl() {

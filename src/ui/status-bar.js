@@ -22,10 +22,15 @@ export function flushStatusDisplayUpdate() {
     runtimeState.pendingStatusDisplay = null;
     if (!payload) return;
 
-    if (payload.signature === runtimeState.lastStatusDisplaySignature) {
+    const domSig = $status.attr('data-pk-sig') || '';
+    if (
+        payload.signature === runtimeState.lastStatusDisplaySignature &&
+        domSig === payload.signature
+    ) {
         return;
     }
     runtimeState.lastStatusDisplaySignature = payload.signature;
+    $status.attr('data-pk-sig', payload.signature);
 
     if (!payload.hasSlots) {
         $status

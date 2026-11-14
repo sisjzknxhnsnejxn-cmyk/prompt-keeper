@@ -12,10 +12,31 @@ import { ensurePCUIWatchdog, startUIObserver, tryInjectUI } from './ui-observer.
 
 let settingsRetryTimer = null;
 
+/**
+ * 将当前最新的插件配置同步到已挂载的设置面板 DOM 控件上，
+ * 防止面板在服务端设置加载完成前先行挂载导致复选框停留在未勾选状态。
+ */
+export function syncSettingsPanelUI() {
+    if (typeof jQuery === 'undefined') return;
+    const $panel = jQuery('#prompt-keeper-settings');
+    if ($panel.length === 0) return;
+
+    const settings = loadPluginSettings();
+    jQuery('#pk-setting-enabled').prop('checked', settings.enabled !== false);
+    jQuery('#pk-setting-auto-restore').prop('checked', settings.autoRestore !== false);
+    jQuery('#pk-setting-custom-save-name').prop('checked', settings.customSaveName === true);
+
+    const $delayInput = jQuery('#pk-setting-delay');
+    if ($delayInput.length > 0 && document.activeElement !== $delayInput[0]) {
+        $delayInput.val(settings.autoRestoreDelay || DEFAULT_AUTO_RESTORE_DELAY_MS);
+    }
+}
+
 export function injectSettingsPanel() {
     if (typeof jQuery === 'undefined') return false;
     const $existing = jQuery('#prompt-keeper-settings');
     if ($existing.length > 0 && typeof document !== 'undefined' && document.body && document.body.contains($existing[0])) {
+        syncSettingsPanelUI();
         return true;
     }
 

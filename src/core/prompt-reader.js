@@ -45,7 +45,7 @@ export function readPromptStatesFromDOM() {
         return null;
     }
 
-    const prompts = Object.create(null);
+    const prompts = {};
     const orderArray = [];
 
     $container.find('[data-pm-identifier], [data-prompt-id]').each(function () {
@@ -86,8 +86,8 @@ export function readPromptStates() {
         const oaiSettings = ctx ? ctx.chatCompletionSettings : null;
 
         if (oaiSettings && Array.isArray(oaiSettings.prompts) && oaiSettings.prompts.length > 0) {
-            const prompts = Object.create(null);
-            const enabledFromOrder = Object.create(null);
+            const prompts = {};
+            const enabledFromOrder = {};
 
             if (Array.isArray(oaiSettings.prompt_order)) {
                 for (const entry of oaiSettings.prompt_order) {

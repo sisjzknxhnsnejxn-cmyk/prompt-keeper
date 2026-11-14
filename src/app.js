@@ -4,10 +4,15 @@
 
 import { LOG_PREFIX, PLUGIN_VERSION } from './config/constants.js';
 import { resetRuntimeState, runtimeState } from './config/runtime-state.js';
-import { isPluginEnabled, loadPluginSettings } from './core/settings.js';
+import { isPluginEnabled, loadPluginSettings, syncPluginSettingsWithServer } from './core/settings.js';
 import { onChatChanged, onUserPresetChanged } from './services/auto-restore-service.js';
 import { hasSavedState } from './services/slot-service.js';
-import { clearSettingsRetryTimer, injectSettingsPanel, tryInjectSettingsPanel } from './ui/settings-panel.js';
+import {
+    clearSettingsRetryTimer,
+    injectSettingsPanel,
+    syncSettingsPanelUI,
+    tryInjectSettingsPanel,
+} from './ui/settings-panel.js';
 import { closeInputModal } from './ui/input-modal.js';
 import { closeSlotPickerModal } from './ui/slot-picker-modal.js';
 import { updateStatusDisplay } from './ui/status-bar.js';
@@ -89,6 +94,7 @@ export function initPromptKeeper(attempt = 0) {
     const ensureUIMounted = (source = 'init') => {
         loadPluginSettings();
         tryInjectSettingsPanel(0);
+        syncSettingsPanelUI();
         bindPromptKeeperButtonDelegation();
 
         if (isPluginEnabled()) {
@@ -103,7 +109,9 @@ export function initPromptKeeper(attempt = 0) {
         const isFirstReady = !runtimeState.promptKeeperAppReadyHandled;
         runtimeState.promptKeeperAppReadyHandled = true;
 
+        syncPluginSettingsWithServer();
         ensureUIMounted('appReady');
+        syncSettingsPanelUI();
 
         if (isFirstReady && isPluginEnabled()) {
             // 无论当前聊天是否已有存档，先记录当前 chatId，防止后续在同聊天保存+切预设+点正则重载时被误判为新聊天
@@ -139,8 +147,30 @@ export function initPromptKeeper(attempt = 0) {
 
     if (event_types.SETTINGS_LOADED_AFTER) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED_AFTER, () => {
+            syncPluginSettingsWithServer();
+            syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             scheduleEnsurePromptKeeperUI('settingsLoadedAfter');
+            updateStatusDisplay();
+        });
+    }
+
+    if (event_types.EXTENSION_SETTINGS_LOADED) {
+        registerEventSourceListener(eventSource, event_types.EXTENSION_SETTINGS_LOADED, () => {
+            syncPluginSettingsWithServer();
+            syncSettingsPanelUI();
+            if (!isPluginEnabled()) return;
+            scheduleEnsurePromptKeeperUI('extensionSettingsLoaded');
+            updateStatusDisplay();
+        });
+    }
+
+    if (event_types.SETTINGS_LOADED) {
+        registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED, () => {
+            syncPluginSettingsWithServer();
+            syncSettingsPanelUI();
+            if (!isPluginEnabled()) return;
+            updateStatusDisplay();
         });
     }
 

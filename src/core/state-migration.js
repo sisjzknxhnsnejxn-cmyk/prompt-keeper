@@ -6,23 +6,45 @@ import {
     AUTO_RESTORE_CONTEXT_POLL_MS,
     AUTO_RESTORE_CONTEXT_TIMEOUT_MS,
     LOG_PREFIX,
+    MAX_BACKUP_CHATS,
+    MAX_GLOBAL_SLOTS,
+    MAX_SLOTS_PER_CHAT,
     METADATA_KEY,
     METADATA_VERSION,
+    SLOTS_BACKUP_STORAGE_KEY,
 } from '../config/constants.js';
 import { runtimeState } from '../config/runtime-state.js';
 import { pkScheduleIdleTask } from '../utils/dom-events.js';
 import { hasOwnSlot, isSafeSlotName, normalizePresetKey, normalizeSlotName } from '../utils/format.js';
 import { getCtxSafe, persistChatMetadata } from '../utils/st-context.js';
-import { loadPluginSettings } from './settings.js';
+import { loadPluginSettings, savePluginSettings } from './settings.js';
+
+function sanitizeSingleSlot(slot, fallbackSlotName = '') {
+    if (!slot || typeof slot !== 'object' || !slot.prompts || typeof slot.prompts !== 'object') {
+        return null;
+    }
+    const cleanPrompts = {};
+    for (const [k, v] of Object.entries(slot.prompts)) {
+        if (!k || k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+        cleanPrompts[k] = Boolean(v);
+    }
+    return {
+        prompts: cleanPrompts,
+        promptOrder: Array.isArray(slot.promptOrder) ? slot.promptOrder : null,
+        presetName: slot.presetName || fallbackSlotName,
+        savedAt: Number(slot.savedAt) || 0,
+    };
+}
 
 function sanitizeSlotsMap(rawSlots) {
-    const cleanSlots = Object.create(null);
+    const cleanSlots = {};
     if (!rawSlots || typeof rawSlots !== 'object') return cleanSlots;
 
     for (const [key, value] of Object.entries(rawSlots)) {
         if (!isSafeSlotName(key)) continue;
-        if (!value || typeof value !== 'object') continue;
-        cleanSlots[key] = value;
+        const cleanSlot = sanitizeSingleSlot(value, key);
+        if (!cleanSlot) continue;
+        cleanSlots[key] = cleanSlot;
     }
     return cleanSlots;
 }
@@ -30,7 +52,7 @@ function sanitizeSlotsMap(rawSlots) {
 export function migrateState(raw) {
     if (!raw || typeof raw !== 'object') return null;
 
-    if (raw.version === 2 && raw.slots && typeof raw.slots === 'object') {
+    if (raw.version === 2 && raw.slots && typeof raw.slots !== 'function') {
         const slots = sanitizeSlotsMap(raw.slots);
         const slotKeys = Object.keys(slots);
         const defaultSlot = raw.defaultSlot && hasOwnSlot(slots, raw.defaultSlot)
@@ -45,13 +67,19 @@ export function migrateState(raw) {
 
     if (!raw.version || raw.version === 1) {
         const slotName = normalizeSlotName(raw.presetName);
-        const slots = Object.create(null);
-        slots[slotName] = {
-            prompts: raw.prompts && typeof raw.prompts === 'object' ? raw.prompts : {},
-            promptOrder: raw.promptOrder || null,
-            presetName: raw.presetName || slotName,
-            savedAt: raw.savedAt || null,
-        };
+        const slots = {};
+        const cleanSlot = sanitizeSingleSlot(
+            {
+                prompts: raw.prompts && typeof raw.prompts === 'object' ? raw.prompts : {},
+                promptOrder: raw.promptOrder || null,
+                presetName: raw.presetName || slotName,
+                savedAt: raw.savedAt || null,
+            },
+            slotName
+        );
+        if (cleanSlot) {
+            slots[slotName] = cleanSlot;
+        }
         return {
             version: METADATA_VERSION,
             defaultSlot: slotName,
@@ -148,6 +176,192 @@ export function getBestRestoreSlotName(state, requestedSlotName = null, currentP
     return getDefaultSlotName(state);
 }
 
+function getSlotBackupStorages() {
+    const adapters = [];
+    try {
+        const ctx = getCtxSafe();
+        if (
+            ctx &&
+            ctx.accountStorage &&
+            typeof ctx.accountStorage.getItem === 'function' &&
+            typeof ctx.accountStorage.setItem === 'function'
+        ) {
+            adapters.push(ctx.accountStorage);
+        }
+    } catch (_) {}
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            adapters.push(window.localStorage);
+        }
+    } catch (_) {}
+    return adapters;
+}
+
+function createEmptySlotsBackup() {
+    return {
+        version: METADATA_VERSION,
+        byChat: {},
+        globalSlots: {},
+    };
+}
+
+function normalizeSlotsBackupObject(raw) {
+    const base = createEmptySlotsBackup();
+    if (!raw || typeof raw !== 'object') return base;
+
+    if (raw.globalSlots && typeof raw.globalSlots === 'object') {
+        base.globalSlots = sanitizeSlotsMap(raw.globalSlots);
+    }
+
+    if (raw.byChat && typeof raw.byChat === 'object') {
+        for (const [chatId, chatState] of Object.entries(raw.byChat)) {
+            if (!chatId || chatId === '__proto__' || chatId === 'constructor' || chatId === 'prototype') {
+                continue;
+            }
+            const migrated = migrateState(chatState);
+            if (migrated && !migrated.__futureVersion && Object.keys(migrated.slots).length > 0) {
+                base.byChat[chatId] = {
+                    version: METADATA_VERSION,
+                    defaultSlot: migrated.defaultSlot,
+                    slots: migrated.slots,
+                    updatedAt: Number(chatState && chatState.updatedAt) || Date.now(),
+                };
+            }
+        }
+    }
+    return base;
+}
+
+export function loadSlotsBackupStore() {
+    let fromStorage = null;
+    for (const storage of getSlotBackupStorages()) {
+        try {
+            const text = storage.getItem(SLOTS_BACKUP_STORAGE_KEY);
+            if (!text) continue;
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed === 'object') {
+                fromStorage = normalizeSlotsBackupObject(parsed);
+                break;
+            }
+        } catch (_) {}
+    }
+
+    let fromSettings = null;
+    try {
+        const settings = loadPluginSettings();
+        if (settings && settings.slotsBackup && typeof settings.slotsBackup === 'object') {
+            fromSettings = normalizeSlotsBackupObject(settings.slotsBackup);
+        }
+    } catch (_) {}
+
+    const merged = createEmptySlotsBackup();
+    const sources = [fromStorage, fromSettings].filter(Boolean);
+
+    for (const src of sources) {
+        for (const [slotName, slot] of Object.entries(src.globalSlots)) {
+            const existing = merged.globalSlots[slotName];
+            if (!existing || (slot.savedAt || 0) >= (existing.savedAt || 0)) {
+                merged.globalSlots[slotName] = slot;
+            }
+        }
+        for (const [chatId, chatEntry] of Object.entries(src.byChat)) {
+            const existing = merged.byChat[chatId];
+            if (!existing || (chatEntry.updatedAt || 0) >= (existing.updatedAt || 0)) {
+                merged.byChat[chatId] = chatEntry;
+            }
+        }
+    }
+
+    return merged;
+}
+
+export function persistSlotsBackupStore(backupStore) {
+    const normalized = normalizeSlotsBackupObject(backupStore);
+
+    const globalEntries = Object.entries(normalized.globalSlots).sort(
+        (a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0)
+    );
+    normalized.globalSlots = {};
+    for (const [k, v] of globalEntries.slice(0, MAX_GLOBAL_SLOTS)) {
+        normalized.globalSlots[k] = v;
+    }
+
+    const chatEntries = Object.entries(normalized.byChat).sort(
+        (a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0)
+    );
+    normalized.byChat = {};
+    for (const [k, v] of chatEntries.slice(0, MAX_BACKUP_CHATS)) {
+        normalized.byChat[k] = v;
+    }
+
+    const serialized = JSON.stringify(normalized);
+    for (const storage of getSlotBackupStorages()) {
+        try {
+            storage.setItem(SLOTS_BACKUP_STORAGE_KEY, serialized);
+        } catch (_) {}
+    }
+
+    try {
+        const settings = loadPluginSettings();
+        if (settings && typeof settings === 'object') {
+            settings.slotsBackup = normalized;
+            savePluginSettings();
+        }
+    } catch (_) {}
+}
+
+export function syncSlotBackupForChat(chatId, savedState, options = {}) {
+    const store = loadSlotsBackupStore();
+    const { deletedSlotName = null, clearAllForChat = false } = options;
+
+    if (deletedSlotName && isSafeSlotName(deletedSlotName)) {
+        delete store.globalSlots[deletedSlotName];
+        for (const chatEntry of Object.values(store.byChat)) {
+            if (chatEntry && chatEntry.slots && hasOwnSlot(chatEntry.slots, deletedSlotName)) {
+                delete chatEntry.slots[deletedSlotName];
+                const rem = Object.keys(chatEntry.slots);
+                if (rem.length === 0) {
+                    chatEntry.defaultSlot = null;
+                } else if (chatEntry.defaultSlot === deletedSlotName) {
+                    chatEntry.defaultSlot = rem[0];
+                }
+            }
+        }
+    }
+
+    if (clearAllForChat) {
+        if (chatId && store.byChat[chatId] && store.byChat[chatId].slots) {
+            for (const key of Object.keys(store.byChat[chatId].slots)) {
+                delete store.globalSlots[key];
+            }
+            delete store.byChat[chatId];
+        } else {
+            store.globalSlots = {};
+        }
+        persistSlotsBackupStore(store);
+        return;
+    }
+
+    const migrated = migrateState(savedState);
+    if (chatId) {
+        if (migrated && !migrated.__futureVersion && Object.keys(migrated.slots).length > 0) {
+            store.byChat[chatId] = {
+                version: METADATA_VERSION,
+                defaultSlot: migrated.defaultSlot,
+                slots: sanitizeSlotsMap(migrated.slots),
+                updatedAt: Date.now(),
+            };
+            for (const [slotName, slot] of Object.entries(store.byChat[chatId].slots)) {
+                store.globalSlots[slotName] = slot;
+            }
+        } else if (!deletedSlotName) {
+            delete store.byChat[chatId];
+        }
+    }
+
+    persistSlotsBackupStore(store);
+}
+
 export function persistMigratedStateIfNeeded(chatMetadata, rawState, migratedState, options = {}) {
     if (!chatMetadata || !rawState || !migratedState || migratedState.__futureVersion) return;
     if (rawState.version === METADATA_VERSION && rawState.slots) return;
@@ -175,9 +389,95 @@ export function persistMigratedStateIfNeeded(chatMetadata, rawState, migratedSta
 export function getSavedStateFromCurrentChat() {
     const ctx = getCtxSafe();
     const chatMetadata = ctx ? ctx.chatMetadata : null;
+    const chatId = ctx ? ctx.chatId : null;
     const rawState = chatMetadata && chatMetadata[METADATA_KEY];
-    const savedState = migrateState(rawState);
-    persistMigratedStateIfNeeded(chatMetadata, rawState, savedState, { deferred: true });
+    let savedState = migrateState(rawState);
+
+    if (savedState && savedState.__futureVersion) {
+        return { chatMetadata, rawState, savedState };
+    }
+
+    const backupStore = loadSlotsBackupStore();
+    let hasChatBoundSlots = Boolean(savedState && getSlotEntries(savedState).length > 0);
+
+    if (hasChatBoundSlots && chatId) {
+        const existingChatBackup = backupStore.byChat[chatId];
+        const currentKeys = Object.keys(savedState.slots);
+        const backupKeys =
+            existingChatBackup && existingChatBackup.slots ? Object.keys(existingChatBackup.slots) : [];
+        let needsSync = currentKeys.length !== backupKeys.length;
+        if (!needsSync) {
+            for (const k of currentKeys) {
+                if (!hasOwnSlot(backupStore.globalSlots, k)) {
+                    needsSync = true;
+                    break;
+                }
+            }
+        }
+        if (needsSync) {
+            syncSlotBackupForChat(chatId, savedState);
+        }
+        persistMigratedStateIfNeeded(chatMetadata, rawState, savedState, { deferred: true });
+    }
+
+    if (!hasChatBoundSlots && chatId && backupStore.byChat[chatId]) {
+        const recovered = migrateState(backupStore.byChat[chatId]);
+        if (recovered && getSlotEntries(recovered).length > 0) {
+            savedState = recovered;
+            hasChatBoundSlots = true;
+            if (chatMetadata) {
+                chatMetadata[METADATA_KEY] = {
+                    version: METADATA_VERSION,
+                    defaultSlot: recovered.defaultSlot,
+                    slots: sanitizeSlotsMap(recovered.slots),
+                };
+                persistMigratedStateIfNeeded(chatMetadata, { version: 1 }, chatMetadata[METADATA_KEY], {
+                    deferred: true,
+                });
+            }
+        }
+    }
+
+    const globalSlotEntries = Object.entries(backupStore.globalSlots)
+        .filter(([k, v]) => isSafeSlotName(k) && v && typeof v === 'object' && v.prompts)
+        .sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0));
+
+    if (globalSlotEntries.length > 0) {
+        if (!savedState || !savedState.slots) {
+            savedState = {
+                version: METADATA_VERSION,
+                defaultSlot: globalSlotEntries[0][0],
+                slots: {},
+            };
+        } else {
+            savedState = {
+                version: METADATA_VERSION,
+                defaultSlot: savedState.defaultSlot,
+                slots: Object.assign({}, savedState.slots),
+            };
+        }
+
+        for (const [slotName, slotData] of globalSlotEntries) {
+            if (hasOwnSlot(savedState.slots, slotName)) continue;
+            if (Object.keys(savedState.slots).length >= MAX_SLOTS_PER_CHAT) break;
+            savedState.slots[slotName] = slotData;
+        }
+
+        if (!savedState.defaultSlot || !hasOwnSlot(savedState.slots, savedState.defaultSlot)) {
+            const first = getSlotEntries(savedState)[0];
+            savedState.defaultSlot = first ? first[0] : null;
+        }
+    }
+
+    if (savedState && typeof savedState === 'object') {
+        Object.defineProperty(savedState, '__hasChatBoundSlots', {
+            value: hasChatBoundSlots,
+            enumerable: false,
+            configurable: true,
+            writable: true,
+        });
+    }
+
     return { chatMetadata, rawState, savedState };
 }
 

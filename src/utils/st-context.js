@@ -2,7 +2,7 @@
  * Prompt Keeper - SillyTavern 上下文与官方/内部模块接口封装
  */
 
-import { CHAT_COMPLETION_API_ID } from '../config/constants.js';
+import { CHAT_COMPLETION_API_ID, METADATA_KEY } from '../config/constants.js';
 import { openConfirmModal, openSaveNameInputModal } from '../ui/input-modal.js';
 
 let cachedOpenAIModulePromise = null;
@@ -63,11 +63,19 @@ export function getChatCompletionPresetManager(ctx = getCtxSafe()) {
 }
 
 /**
- * 持久化当前聊天元数据
+ * 持久化当前聊天元数据（同时调用 updateChatMetadata 与 saveMetadata 确保 SillyTavern 内部引用与落盘一致）
  */
 export function persistChatMetadata() {
     const ctx = getCtxSafe();
     if (!ctx) return Promise.resolve();
+    try {
+        if (ctx.chatMetadata && typeof ctx.updateChatMetadata === 'function') {
+            ctx.updateChatMetadata(
+                { [METADATA_KEY]: ctx.chatMetadata[METADATA_KEY] },
+                false
+            );
+        }
+    } catch (_) {}
     if (typeof ctx.saveMetadata === 'function') {
         return ctx.saveMetadata();
     }

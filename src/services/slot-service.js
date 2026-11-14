@@ -18,6 +18,7 @@ import {
     getBestRestoreSlotName,
     getSavedStateFromCurrentChat,
     getSlotEntries,
+    syncSlotBackupForChat,
 } from '../core/state-migration.js';
 import { updateStatusDisplay } from '../ui/status-bar.js';
 import {
@@ -115,12 +116,12 @@ export async function saveStatesToMetadata(slotNameOverride = null) {
                 ? {
                       version: METADATA_VERSION,
                       defaultSlot: savedState.defaultSlot,
-                      slots: Object.assign(Object.create(null), savedState.slots),
+                      slots: Object.assign({}, savedState.slots),
                   }
                 : {
                       version: METADATA_VERSION,
                       defaultSlot: null,
-                      slots: Object.create(null),
+                      slots: {},
                   };
 
         const existingKey = settings.customSaveName
@@ -141,13 +142,14 @@ export async function saveStatesToMetadata(slotNameOverride = null) {
         }
 
         nextState.slots[targetSlotName] = {
-            prompts: states.prompts,
+            prompts: Object.assign({}, states.prompts),
             promptOrder: states.promptOrder || null,
             presetName: presetName || targetSlotName,
             savedAt: Date.now(),
         };
         nextState.defaultSlot = targetSlotName;
         chatMetadata[METADATA_KEY] = nextState;
+        syncSlotBackupForChat(chatId, nextState);
 
         runtimeState.justSavedChatId = chatId;
         runtimeState.lastHandledChatId = chatId;
@@ -359,10 +361,12 @@ export async function deleteSavedStates(slotName = null, skipConfirm = false) {
     runtimeState.deleteInProgress = true;
 
     try {
+        const ctx = getCtxSafe();
+        const chatId = ctx ? ctx.chatId : null;
         const { chatMetadata, savedState } = getSavedStateFromCurrentChat();
         const entries = getSlotEntries(savedState);
 
-        if (!chatMetadata || !savedState || entries.length === 0) {
+        if (!savedState || entries.length === 0) {
             if (typeof toastr !== 'undefined') {
                 toastr.info('当前聊天没有已保存的预设条目状态。', 'Prompt Keeper');
             }
@@ -393,12 +397,14 @@ export async function deleteSavedStates(slotName = null, skipConfirm = false) {
             delete savedState.slots[targetSlot];
             const remaining = getSlotEntries(savedState);
             if (remaining.length === 0) {
-                delete chatMetadata[METADATA_KEY];
+                if (chatMetadata) delete chatMetadata[METADATA_KEY];
+                syncSlotBackupForChat(chatId, null, { deletedSlotName: targetSlot });
             } else {
                 if (savedState.defaultSlot === targetSlot) {
                     savedState.defaultSlot = remaining[0][0];
                 }
-                chatMetadata[METADATA_KEY] = savedState;
+                if (chatMetadata) chatMetadata[METADATA_KEY] = savedState;
+                syncSlotBackupForChat(chatId, savedState, { deletedSlotName: targetSlot });
             }
 
             await persistChatMetadata();
@@ -417,7 +423,8 @@ export async function deleteSavedStates(slotName = null, skipConfirm = false) {
             if (!confirmed) return false;
         }
 
-        delete chatMetadata[METADATA_KEY];
+        if (chatMetadata) delete chatMetadata[METADATA_KEY];
+        syncSlotBackupForChat(chatId, null, { clearAllForChat: true });
         await persistChatMetadata();
         if (typeof toastr !== 'undefined') {
             toastr.info('已清除此聊天的全部已保存预设状态。', 'Prompt Keeper');
@@ -435,8 +442,10 @@ export async function deleteSavedStates(slotName = null, skipConfirm = false) {
 
 export async function setDefaultSlot(slotName) {
     try {
+        const ctx = getCtxSafe();
+        const chatId = ctx ? ctx.chatId : null;
         const { chatMetadata, savedState } = getSavedStateFromCurrentChat();
-        if (!chatMetadata || !savedState || !savedState.slots || !hasOwnSlot(savedState.slots, slotName)) {
+        if (!savedState || !savedState.slots || !hasOwnSlot(savedState.slots, slotName)) {
             return false;
         }
         if (savedState.__futureVersion) {
@@ -447,7 +456,8 @@ export async function setDefaultSlot(slotName) {
         }
 
         savedState.defaultSlot = slotName;
-        chatMetadata[METADATA_KEY] = savedState;
+        if (chatMetadata) chatMetadata[METADATA_KEY] = savedState;
+        syncSlotBackupForChat(chatId, savedState);
         await persistChatMetadata();
 
         if (typeof toastr !== 'undefined') {

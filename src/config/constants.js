@@ -4,12 +4,16 @@
  */
 
 export const EXTENSION_NAME = 'prompt-keeper';
-export const PLUGIN_VERSION = '2.2.2';
+export const PLUGIN_VERSION = '2.2.3';
 export const LOG_PREFIX = '[PromptKeeper]';
 export const METADATA_KEY = 'promptKeeperState';
 export const SETTINGS_KEY = 'promptKeeperPluginSettings';
+export const SETTINGS_BACKUP_STORAGE_KEY = 'promptKeeper_settings_backup_v1';
+export const SLOTS_BACKUP_STORAGE_KEY = 'promptKeeper_slots_backup_v2';
 export const METADATA_VERSION = 2;
 export const MAX_SLOTS_PER_CHAT = 5;
+export const MAX_BACKUP_CHATS = 60;
+export const MAX_GLOBAL_SLOTS = 20;
 export const DEFAULT_AUTO_RESTORE_DELAY_MS = 1500;
 
 export const DEFAULT_SETTINGS = Object.freeze({
