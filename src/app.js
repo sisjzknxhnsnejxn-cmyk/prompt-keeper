@@ -4,9 +4,15 @@
 
 import { LOG_PREFIX, PLUGIN_VERSION } from './config/constants.js';
 import { resetRuntimeState, runtimeState } from './config/runtime-state.js';
-import { isPluginEnabled, loadPluginSettings, syncPluginSettingsWithServer } from './core/settings.js';
+import {
+    cleanupLegacyAccountStorage,
+    isPluginEnabled,
+    loadPluginSettings,
+    syncPluginSettingsWithServer,
+} from './core/settings.js';
+import { invalidateSlotsBackupCache } from './core/state-migration.js';
 import { onChatChanged, onUserPresetChanged } from './services/auto-restore-service.js';
-import { hasSavedState } from './services/slot-service.js';
+import { hasChatBoundSavedState } from './services/slot-service.js';
 import {
     clearSettingsRetryTimer,
     injectSettingsPanel,
@@ -110,6 +116,8 @@ export function initPromptKeeper(attempt = 0) {
         runtimeState.promptKeeperAppReadyHandled = true;
 
         syncPluginSettingsWithServer();
+        invalidateSlotsBackupCache();
+        cleanupLegacyAccountStorage();
         ensureUIMounted('appReady');
         syncSettingsPanelUI();
 
@@ -122,7 +130,7 @@ export function initPromptKeeper(attempt = 0) {
                 }
             } catch (_) {}
 
-            if (hasSavedState()) {
+            if (hasChatBoundSavedState()) {
                 // 启动时若已有存档，重置 lastHandledChatId 以便首次正常执行自动恢复
                 runtimeState.lastHandledChatId = null;
                 onChatChanged();
@@ -148,6 +156,7 @@ export function initPromptKeeper(attempt = 0) {
     if (event_types.SETTINGS_LOADED_AFTER) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED_AFTER, () => {
             syncPluginSettingsWithServer();
+            invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             scheduleEnsurePromptKeeperUI('settingsLoadedAfter');
@@ -158,6 +167,7 @@ export function initPromptKeeper(attempt = 0) {
     if (event_types.EXTENSION_SETTINGS_LOADED) {
         registerEventSourceListener(eventSource, event_types.EXTENSION_SETTINGS_LOADED, () => {
             syncPluginSettingsWithServer();
+            invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             scheduleEnsurePromptKeeperUI('extensionSettingsLoaded');
@@ -168,6 +178,7 @@ export function initPromptKeeper(attempt = 0) {
     if (event_types.SETTINGS_LOADED) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED, () => {
             syncPluginSettingsWithServer();
+            invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             updateStatusDisplay();
@@ -221,7 +232,7 @@ export function initPromptKeeper(attempt = 0) {
     // 先尝试挂载一次（应对在 APP_READY 之后热重载或延迟加载的场景），
     // 同时不锁死 promptKeeperAppReadyHandled，确保真正的 APP_READY 到来时还会再次挂载。
     ensureUIMounted('init');
-    if (isPluginEnabled() && hasSavedState()) {
+    if (isPluginEnabled() && ctx.chatId && hasChatBoundSavedState()) {
         onChatChanged();
     } else {
         updateStatusDisplay();

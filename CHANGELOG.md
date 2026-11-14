@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Keeper** are documented in this file.
 
+## [v2.2.4] - 2026-11-14
+
+### 🐛 Bug Fixes & Startup Stability
+- **修复启动时酒馆自动强制刷新页面的问题**：
+  - 移除对 SillyTavern `ctx.accountStorage` 的不当调用，并在 `APP_READY` 后自动清理旧版遗留的冗余备份键（`promptKeeper_settings_backup_v1`、`promptKeeper_slots_backup_v2`），防止全量预设槽位被重复打包进服务端 `settings.json` 触发启动超时与 `reloadLoop()` 静默刷新。
+  - 将 `getSavedStateFromCurrentChat()` 与 `loadPluginSettings()` 改造为纯只读函数，彻底消除 UI 状态栏渲染与启动阶段隐式触发 `saveSettingsDebounced()` / `saveMetadata()` 的写风暴。
+  - 为 `loadSlotsBackupStore()` 增加内存级缓存，避免启动期间高频重复执行 `JSON.parse` 与深层对象克隆；服务端 `extensionSettings` 仅保存去重后的 `globalSlots` 与轻量级聊天绑定索引（`chatBindings`）。
+  - 区分聊天绑定槽位判定 `hasChatBoundSavedState()` 与全局槽位判定 `hasSavedState()`，杜绝在酒馆启动欢迎页（无打开聊天）或无绑定存档的新聊天中因全局兜底池误触发自动切换预设。
+  - 修复 `index.js` 与 `src/utils/st-context.js` 中的脚本及模块路径解析兼容性，统一版本号为 `2.2.4`。
+
 ## [v2.2.3] - 2026-11-14
 
 ### 🐛 Bug Fixes & Persistence Hardening

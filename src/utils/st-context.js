@@ -15,16 +15,22 @@ export async function getSillyTavernOpenAIModule() {
     if (typeof window === 'undefined') return null;
     if (!cachedOpenAIModulePromise) {
         cachedOpenAIModulePromise = (async () => {
+            const candidateUrls = [];
             try {
-                const relativeUrl = new URL('../../../../openai.js', import.meta.url).href;
-                return await import(relativeUrl);
-            } catch (_) {
+                candidateUrls.push(new URL('../../../../../openai.js', import.meta.url).href);
+            } catch (_) {}
+            try {
+                candidateUrls.push(new URL('../../../../openai.js', import.meta.url).href);
+            } catch (_) {}
+            candidateUrls.push('/scripts/openai.js');
+
+            for (const url of candidateUrls) {
                 try {
-                    return await import('/scripts/openai.js');
-                } catch (__) {
-                    return null;
-                }
+                    const mod = await import(url);
+                    if (mod) return mod;
+                } catch (_) {}
             }
+            return null;
         })();
     }
     return cachedOpenAIModulePromise;

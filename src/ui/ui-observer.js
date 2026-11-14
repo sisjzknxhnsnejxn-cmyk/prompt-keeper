@@ -356,10 +356,7 @@ export function scheduleEnsurePromptKeeperUI(reason = 'event') {
                 injectSettingsPanel();
             } catch (_) {}
             if (!isPluginEnabled()) return;
-            const injected = injectUI();
-            if (injected) {
-                updateStatusDisplay();
-            }
+            injectUI();
         }, delay);
         runtimeState.uiEnsureTimers.push(timer);
     }

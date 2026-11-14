@@ -49,6 +49,25 @@ export function hasSavedState() {
     }
 }
 
+/**
+ * 判断当前打开的聊天是否拥有绑定于该聊天的预设槽位（不含仅从全局兜底池合并的槽位）。
+ * 专用于自动恢复判定，避免在欢迎页或无绑定存档的新聊天中误触发自动切换预设。
+ */
+export function hasChatBoundSavedState() {
+    try {
+        const ctx = getCtxSafe();
+        if (!ctx || !ctx.chatId) return false;
+        const { savedState } = getSavedStateFromCurrentChat();
+        return Boolean(
+            savedState &&
+                savedState.__hasChatBoundSlots &&
+                getSlotEntries(savedState).length > 0
+        );
+    } catch (_) {
+        return false;
+    }
+}
+
 export async function saveStatesToMetadata(slotNameOverride = null) {
     if (
         runtimeState.saveInProgress ||

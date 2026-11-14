@@ -6,35 +6,46 @@ import {
     DEFAULT_SETTINGS,
     SETTINGS_BACKUP_STORAGE_KEY,
     SETTINGS_KEY,
+    SLOTS_BACKUP_STORAGE_KEY,
 } from '../config/constants.js';
 import { runtimeState } from '../config/runtime-state.js';
 import { getCtxSafe } from '../utils/st-context.js';
 
 let inMemorySettings = null;
+let legacyAccountStorageCleaned = false;
 
-function getStorageAdapters() {
-    const adapters = [];
-    // AccountStorage 在 SillyTavern 完成 initUserStorage / APP_READY 前处于未就绪态，
-    // 提前访问会触发控制台 "AccountStorage not ready" 警告且无法读取服务端状态。
-    if (runtimeState.promptKeeperAppReadyHandled) {
-        try {
-            const ctx = getCtxSafe();
-            if (
-                ctx &&
-                ctx.accountStorage &&
-                typeof ctx.accountStorage.getItem === 'function' &&
-                typeof ctx.accountStorage.setItem === 'function'
-            ) {
-                adapters.push(ctx.accountStorage);
-            }
-        } catch (_) {}
-    }
+function getLocalStorageSafe() {
     try {
         if (typeof window !== 'undefined' && window.localStorage) {
-            adapters.push(window.localStorage);
+            return window.localStorage;
         }
     } catch (_) {}
-    return adapters;
+    return null;
+}
+
+/**
+ * 清理 v2.2.3 遗留在 SillyTavern accountStorage 中的大体量冗余备份键，
+ * 防止 accountStorage.getState() 将重复数据打包进 /api/settings/save 导致 settings.json 膨胀。
+ */
+export function cleanupLegacyAccountStorage() {
+    if (legacyAccountStorageCleaned || !runtimeState.promptKeeperAppReadyHandled) return;
+    try {
+        const ctx = getCtxSafe();
+        if (
+            ctx &&
+            ctx.accountStorage &&
+            typeof ctx.accountStorage.getItem === 'function' &&
+            typeof ctx.accountStorage.removeItem === 'function'
+        ) {
+            legacyAccountStorageCleaned = true;
+            if (ctx.accountStorage.getItem(SETTINGS_BACKUP_STORAGE_KEY) !== null) {
+                ctx.accountStorage.removeItem(SETTINGS_BACKUP_STORAGE_KEY);
+            }
+            if (ctx.accountStorage.getItem(SLOTS_BACKUP_STORAGE_KEY) !== null) {
+                ctx.accountStorage.removeItem(SLOTS_BACKUP_STORAGE_KEY);
+            }
+        }
+    } catch (_) {}
 }
 
 function sanitizeSettingsObject(raw, fallback = DEFAULT_SETTINGS) {
@@ -74,21 +85,23 @@ function sanitizeSettingsObject(raw, fallback = DEFAULT_SETTINGS) {
 }
 
 export function readSettingsBackupFromStorage() {
-    for (const storage of getStorageAdapters()) {
-        try {
-            const rawText = storage.getItem(SETTINGS_BACKUP_STORAGE_KEY);
-            if (!rawText) continue;
-            const parsed = JSON.parse(rawText);
-            if (parsed && typeof parsed === 'object') {
-                return sanitizeSettingsObject(parsed, DEFAULT_SETTINGS);
-            }
-        } catch (_) {}
-    }
+    const storage = getLocalStorageSafe();
+    if (!storage) return null;
+    try {
+        const rawText = storage.getItem(SETTINGS_BACKUP_STORAGE_KEY);
+        if (!rawText) return null;
+        const parsed = JSON.parse(rawText);
+        if (parsed && typeof parsed === 'object') {
+            return sanitizeSettingsObject(parsed, DEFAULT_SETTINGS);
+        }
+    } catch (_) {}
     return null;
 }
 
 export function writeSettingsBackupToStorage(settings) {
     if (!settings || typeof settings !== 'object') return;
+    const storage = getLocalStorageSafe();
+    if (!storage) return;
     const payload = {
         enabled: Boolean(settings.enabled),
         autoRestore: Boolean(settings.autoRestore),
@@ -99,53 +112,51 @@ export function writeSettingsBackupToStorage(settings) {
             : DEFAULT_SETTINGS.slotPickerTheme,
         updatedAt: Date.now(),
     };
-    const serialized = JSON.stringify(payload);
-    for (const storage of getStorageAdapters()) {
-        try {
-            storage.setItem(SETTINGS_BACKUP_STORAGE_KEY, serialized);
-        } catch (_) {}
-    }
+    try {
+        storage.setItem(SETTINGS_BACKUP_STORAGE_KEY, JSON.stringify(payload));
+    } catch (_) {}
 }
 
 /**
- * 读取并初始化插件配置，确保所有默认字段均存在且合法。
- * 在 SillyTavern 尚未完成 extension_settings 加载前，不提前用默认值覆盖 ctx.extensionSettings[SETTINGS_KEY]。
+ * 纯只读加载插件设置（严禁在读取期间触发 saveSettingsDebounced 等服务端写操作）
  */
 export function loadPluginSettings() {
-    const backup = readSettingsBackupFromStorage();
-    const fallbackBase = sanitizeSettingsObject(inMemorySettings || backup || DEFAULT_SETTINGS, DEFAULT_SETTINGS);
     const ctx = getCtxSafe();
+    const hasExtensionSettingsContainer = Boolean(
+        ctx && ctx.extensionSettings && typeof ctx.extensionSettings === 'object'
+    );
 
-    if (!ctx || !ctx.extensionSettings || typeof ctx.extensionSettings !== 'object') {
-        inMemorySettings = fallbackBase;
+    if (hasExtensionSettingsContainer) {
+        const existingServerObj = ctx.extensionSettings[SETTINGS_KEY];
+        if (existingServerObj && typeof existingServerObj === 'object') {
+            if (inMemorySettings === existingServerObj) {
+                return inMemorySettings;
+            }
+            const backup = readSettingsBackupFromStorage();
+            const merged = sanitizeSettingsObject(existingServerObj, backup || DEFAULT_SETTINGS);
+            existingServerObj.enabled = merged.enabled;
+            existingServerObj.autoRestore = merged.autoRestore;
+            existingServerObj.customSaveName = merged.customSaveName;
+            existingServerObj.autoRestoreDelay = merged.autoRestoreDelay;
+            existingServerObj.slotPickerTheme = merged.slotPickerTheme;
+            if (merged.slotsBackup && !existingServerObj.slotsBackup) {
+                existingServerObj.slotsBackup = merged.slotsBackup;
+            }
+            inMemorySettings = existingServerObj;
+            return existingServerObj;
+        }
+    }
+
+    if (inMemorySettings) {
         return inMemorySettings;
     }
 
-    const existingServerObj = ctx.extensionSettings[SETTINGS_KEY];
-    if (existingServerObj && typeof existingServerObj === 'object') {
-        const merged = sanitizeSettingsObject(existingServerObj, backup || DEFAULT_SETTINGS);
-        existingServerObj.enabled = merged.enabled;
-        existingServerObj.autoRestore = merged.autoRestore;
-        existingServerObj.customSaveName = merged.customSaveName;
-        existingServerObj.autoRestoreDelay = merged.autoRestoreDelay;
-        existingServerObj.slotPickerTheme = merged.slotPickerTheme;
-        if (merged.slotsBackup && !existingServerObj.slotsBackup) {
-            existingServerObj.slotsBackup = merged.slotsBackup;
-        }
-        inMemorySettings = existingServerObj;
-        writeSettingsBackupToStorage(existingServerObj);
-        return existingServerObj;
-    }
+    const backup = readSettingsBackupFromStorage();
+    const fallbackBase = sanitizeSettingsObject(backup, DEFAULT_SETTINGS);
 
-    if (runtimeState.promptKeeperAppReadyHandled) {
+    if (hasExtensionSettingsContainer && runtimeState.promptKeeperAppReadyHandled) {
         ctx.extensionSettings[SETTINGS_KEY] = Object.assign({}, fallbackBase);
         inMemorySettings = ctx.extensionSettings[SETTINGS_KEY];
-        if (backup) {
-            writeSettingsBackupToStorage(inMemorySettings);
-            if (typeof ctx.saveSettingsDebounced === 'function') {
-                ctx.saveSettingsDebounced();
-            }
-        }
         return inMemorySettings;
     }
 
@@ -155,10 +166,9 @@ export function loadPluginSettings() {
 
 /**
  * 当 SillyTavern 完成服务端设置加载（SETTINGS_LOADED / EXTENSION_SETTINGS_LOADED / APP_READY）时调用，
- * 确保服务端设置与本地备份双向对齐。
+ * 将内存与服务端设置对象对齐，不在启动中途抢跑触发写请求。
  */
 export function syncPluginSettingsWithServer() {
-    runtimeState.promptKeeperAppReadyHandled = true;
     const backup = readSettingsBackupFromStorage();
     const ctx = getCtxSafe();
     if (!ctx || !ctx.extensionSettings || typeof ctx.extensionSettings !== 'object') {
@@ -182,14 +192,14 @@ export function syncPluginSettingsWithServer() {
     ctx.extensionSettings[SETTINGS_KEY] = restored;
     inMemorySettings = restored;
     writeSettingsBackupToStorage(restored);
-    if (backup && typeof ctx.saveSettingsDebounced === 'function') {
+    if (runtimeState.promptKeeperAppReadyHandled && backup && typeof ctx.saveSettingsDebounced === 'function') {
         ctx.saveSettingsDebounced();
     }
     return restored;
 }
 
 /**
- * 防抖保存插件配置到 SillyTavern 服务端，并立即同步写入本地备份
+ * 防抖保存插件配置到 SillyTavern 服务端，并立即同步写入本地备份（仅在用户主动变更配置或槽位时调用）
  */
 export function savePluginSettings() {
     const ctx = getCtxSafe();
@@ -204,7 +214,7 @@ export function savePluginSettings() {
         inMemorySettings = ctx.extensionSettings[SETTINGS_KEY];
         writeSettingsBackupToStorage(inMemorySettings);
 
-        if (typeof ctx.saveSettingsDebounced === 'function') {
+        if (runtimeState.promptKeeperAppReadyHandled && typeof ctx.saveSettingsDebounced === 'function') {
             ctx.saveSettingsDebounced();
         }
         return;

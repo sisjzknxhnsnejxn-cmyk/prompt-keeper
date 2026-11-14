@@ -14,7 +14,7 @@ import { getSavedStateFromCurrentChat, waitForChatContext } from '../core/state-
 import { updateStatusDisplay } from '../ui/status-bar.js';
 import { scheduleEnsurePromptKeeperUI } from '../ui/ui-observer.js';
 import { getCtxSafe, isChatCompletionActive } from '../utils/st-context.js';
-import { hasSavedState, restoreStatesFromMetadata } from './slot-service.js';
+import { hasChatBoundSavedState, restoreStatesFromMetadata } from './slot-service.js';
 
 /**
  * 当用户在当前聊天主动手动切换预设时调用：
@@ -81,7 +81,7 @@ export function scheduleAutoRestoreRetry(chatId, reason) {
             }
 
             const contextReady = await waitForChatContext(chatId, 2000);
-            if (!contextReady || !hasSavedState()) return;
+            if (!contextReady || !hasChatBoundSavedState()) return;
             if (runtimeState.manualPresetOverrideChatId === chatId || runtimeState.justSavedChatId === chatId) {
                 return;
             }
@@ -193,7 +193,7 @@ export function onChatChanged() {
             return;
         }
 
-        if (hasSavedState()) {
+        if (hasChatBoundSavedState()) {
             const { savedState } = getSavedStateFromCurrentChat();
             const defaultSlotName = savedState ? savedState.defaultSlot : null;
             console.log(

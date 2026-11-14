@@ -11,7 +11,7 @@
 
 (function loadPromptKeeperExtension() {
     const PLUGIN_FOLDER = 'prompt-keeper';
-    const PLUGIN_VERSION = '2.2.3';
+    const PLUGIN_VERSION = '2.2.4';
     const LOADER_STATE_KEY = '__promptKeeperLoaderState';
 
     function resolveExtensionRootUrl() {
@@ -26,6 +26,7 @@
                     const src = script && script.src ? script.src : '';
                     return (
                         src.includes(`/${PLUGIN_FOLDER}/index.js`) ||
+                        src.includes('/SillyTavern-Preset-Prompt-Switcher/index.js') ||
                         (src.includes(PLUGIN_FOLDER) && src.includes('index.js'))
                     );
                 });
