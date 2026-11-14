@@ -14,17 +14,21 @@ let inMemorySettings = null;
 
 function getStorageAdapters() {
     const adapters = [];
-    try {
-        const ctx = getCtxSafe();
-        if (
-            ctx &&
-            ctx.accountStorage &&
-            typeof ctx.accountStorage.getItem === 'function' &&
-            typeof ctx.accountStorage.setItem === 'function'
-        ) {
-            adapters.push(ctx.accountStorage);
-        }
-    } catch (_) {}
+    // AccountStorage 在 SillyTavern 完成 initUserStorage / APP_READY 前处于未就绪态，
+    // 提前访问会触发控制台 "AccountStorage not ready" 警告且无法读取服务端状态。
+    if (runtimeState.promptKeeperAppReadyHandled) {
+        try {
+            const ctx = getCtxSafe();
+            if (
+                ctx &&
+                ctx.accountStorage &&
+                typeof ctx.accountStorage.getItem === 'function' &&
+                typeof ctx.accountStorage.setItem === 'function'
+            ) {
+                adapters.push(ctx.accountStorage);
+            }
+        } catch (_) {}
+    }
     try {
         if (typeof window !== 'undefined' && window.localStorage) {
             adapters.push(window.localStorage);
@@ -154,12 +158,11 @@ export function loadPluginSettings() {
  * 确保服务端设置与本地备份双向对齐。
  */
 export function syncPluginSettingsWithServer() {
+    runtimeState.promptKeeperAppReadyHandled = true;
     const backup = readSettingsBackupFromStorage();
     const ctx = getCtxSafe();
-    if (!ctx) return loadPluginSettings();
-
-    if (!ctx.extensionSettings || typeof ctx.extensionSettings !== 'object') {
-        ctx.extensionSettings = {};
+    if (!ctx || !ctx.extensionSettings || typeof ctx.extensionSettings !== 'object') {
+        return loadPluginSettings();
     }
 
     const serverSettings = ctx.extensionSettings[SETTINGS_KEY];
@@ -192,10 +195,7 @@ export function savePluginSettings() {
     const ctx = getCtxSafe();
     const current = inMemorySettings || loadPluginSettings();
 
-    if (ctx) {
-        if (!ctx.extensionSettings || typeof ctx.extensionSettings !== 'object') {
-            ctx.extensionSettings = {};
-        }
+    if (ctx && ctx.extensionSettings && typeof ctx.extensionSettings === 'object') {
         if (!ctx.extensionSettings[SETTINGS_KEY] || typeof ctx.extensionSettings[SETTINGS_KEY] !== 'object') {
             ctx.extensionSettings[SETTINGS_KEY] = Object.assign({}, current);
         } else if (ctx.extensionSettings[SETTINGS_KEY] !== current) {

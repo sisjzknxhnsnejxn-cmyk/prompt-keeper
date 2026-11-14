@@ -10,8 +10,8 @@ All notable changes to **Prompt Keeper** are documented in this file.
   - 新增 `syncPluginSettingsWithServer()` 与 `syncSettingsPanelUI()`，在 `APP_READY`、`SETTINGS_LOADED`、`EXTENSION_SETTINGS_LOADED`、`SETTINGS_LOADED_AFTER` 及设置面板重绘时实时同步复选框状态。
   - 新增浏览器本地存储（`accountStorage` / `localStorage`）双保险设置镜像备份（`promptKeeper_settings_backup_v1`），即使插件卸载重装也能自动恢复全部开关偏好。
 - **修复已保存的预设槽位在更新、刷新或重装后丢失/不显示的问题**：
-  - 移除 `slots` 与 `prompts` 数据结构中的 `Object.create(null)`，统一改用标准 Plain Object `{}` + `hasOwnProperty` 安全校验，防止在 SillyTavern `updateChatMetadata` / `jQuery.extend` 深拷贝时因无原型链被丢弃。
-  - 在 `persistChatMetadata()` 中同步调用 `ctx.updateChatMetadata` 与 `ctx.saveMetadata()`。
+  - 移除 `slots` 与 `prompts` 数据结构中的 `Object.create(null)`，统一改用标准 Plain Object `{}` + `hasOwnProperty` 安全校验，防止在深拷贝或序列化时因无原型链被丢弃。
+  - 严格对齐 SillyTavern 官方源码规范，原地修改 `ctx.chatMetadata[METADATA_KEY]` 后调用 `ctx.saveMetadata()`（移除一切不存在的猜测接口与无效 DOM 选择器）。
   - 新增三重槽位持久化架构（`chatMetadata` + `extensionSettings.slotsBackup` + 本地存储 `promptKeeper_slots_backup_v2`），同时维护聊天级槽位自愈备份与全局槽位池，确保用户保存的槽位永久留存。
   - 修复 `status-bar.js` 中操作栏 DOM 重建后因内存签名缓存提前退出导致状态栏卡在「未保存」的问题。
 - 统一同步 `index.js`、`manifest.json` 与 `src/config/constants.js` 版本号为 `2.2.3`。

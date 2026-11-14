@@ -2,19 +2,30 @@
  * Prompt Keeper - SillyTavern 上下文与官方/内部模块接口封装
  */
 
-import { CHAT_COMPLETION_API_ID, METADATA_KEY } from '../config/constants.js';
+import { CHAT_COMPLETION_API_ID } from '../config/constants.js';
 import { openConfirmModal, openSaveNameInputModal } from '../ui/input-modal.js';
 
 let cachedOpenAIModulePromise = null;
 
 /**
- * 动态导入酒馆内置 `/scripts/openai.js` 模块（原生浏览器环境支持直接访问酒馆内部导出的 promptManager / oai_settings 等）
- * 在非浏览器或路径不可用环境下静默返回 null。
+ * 动态导入酒馆内置 `public/scripts/openai.js` 模块（访问官方导出的 promptManager / oai_settings 等）
+ * 优先使用基于当前脚本位置的相对 URL（兼容反向代理子路径部署），回退到 `/scripts/openai.js`。
  */
 export async function getSillyTavernOpenAIModule() {
     if (typeof window === 'undefined') return null;
     if (!cachedOpenAIModulePromise) {
-        cachedOpenAIModulePromise = import('/scripts/openai.js').catch(() => null);
+        cachedOpenAIModulePromise = (async () => {
+            try {
+                const relativeUrl = new URL('../../../../openai.js', import.meta.url).href;
+                return await import(relativeUrl);
+            } catch (_) {
+                try {
+                    return await import('/scripts/openai.js');
+                } catch (__) {
+                    return null;
+                }
+            }
+        })();
     }
     return cachedOpenAIModulePromise;
 }
@@ -63,19 +74,12 @@ export function getChatCompletionPresetManager(ctx = getCtxSafe()) {
 }
 
 /**
- * 持久化当前聊天元数据（同时调用 updateChatMetadata 与 saveMetadata 确保 SillyTavern 内部引用与落盘一致）
+ * 持久化当前聊天元数据（遵循 SillyTavern 官方规范：直接原地修改 ctx.chatMetadata 后调用 saveMetadata，
+ * 不调用会替换全局 chat_metadata 对象引用的 updateChatMetadata）
  */
 export function persistChatMetadata() {
     const ctx = getCtxSafe();
     if (!ctx) return Promise.resolve();
-    try {
-        if (ctx.chatMetadata && typeof ctx.updateChatMetadata === 'function') {
-            ctx.updateChatMetadata(
-                { [METADATA_KEY]: ctx.chatMetadata[METADATA_KEY] },
-                false
-            );
-        }
-    } catch (_) {}
     if (typeof ctx.saveMetadata === 'function') {
         return ctx.saveMetadata();
     }
@@ -86,7 +90,7 @@ export function persistChatMetadata() {
 }
 
 /**
- * 判断當前是否处于移动端视图
+ * 判断当前是否处于移动端视图
  */
 export function isMobileDevice(ctx = getCtxSafe()) {
     if (!ctx) return false;
@@ -94,7 +98,7 @@ export function isMobileDevice(ctx = getCtxSafe()) {
 }
 
 /**
- * 弹出文本输入框：优先使用内置极简 iOS 适配弹窗，回退到酒馆原生 Popup 或 window.prompt
+ * 弹出文本输入框：优先使用内置极简 iOS 适配弹窗，回退到酒馆原生 Popup.show.input / callGenericPopup 或 window.prompt
  * @param {string} message 提示标题/内容
  * @param {string} defaultValue 默认输入值
  * @returns {Promise<string|null>} 用户输入字符串，取消则返回 null
@@ -107,6 +111,16 @@ export async function showInputPopup(message, defaultValue = '') {
     }
 
     const ctx = getCtxSafe();
+    if (ctx && ctx.Popup && ctx.Popup.show && typeof ctx.Popup.show.input === 'function') {
+        try {
+            const result = await ctx.Popup.show.input(message, '', defaultValue);
+            if (result === null || result === undefined || result === false) {
+                return null;
+            }
+            return String(result);
+        } catch (_) {}
+    }
+
     if (ctx && typeof ctx.callGenericPopup === 'function' && ctx.POPUP_TYPE && ctx.POPUP_TYPE.INPUT !== undefined) {
         try {
             const result = await ctx.callGenericPopup(message, ctx.POPUP_TYPE.INPUT, defaultValue);
@@ -114,9 +128,7 @@ export async function showInputPopup(message, defaultValue = '') {
                 return null;
             }
             return String(result);
-        } catch (_) {
-            // 回退到浏览器原生 prompt
-        }
+        } catch (_) {}
     }
 
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
@@ -126,7 +138,7 @@ export async function showInputPopup(message, defaultValue = '') {
 }
 
 /**
- * 弹出确认对话框：优先使用内置极简 iOS 适配确认框，回退到酒馆原生异步 Popup 或 window.confirm
+ * 弹出确认对话框：优先使用内置极简 iOS 适配确认框，回退到酒馆原生 Popup.show.confirm / callGenericPopup 或 window.confirm
  * @param {string} message 确认提示信息
  * @returns {Promise<boolean>}
  */
@@ -138,16 +150,24 @@ export async function showConfirmPopup(message) {
     }
 
     const ctx = getCtxSafe();
+    if (ctx && ctx.Popup && ctx.Popup.show && typeof ctx.Popup.show.confirm === 'function') {
+        try {
+            const result = await ctx.Popup.show.confirm(message, '');
+            if (ctx.POPUP_RESULT && ctx.POPUP_RESULT.AFFIRMATIVE !== undefined) {
+                return result === ctx.POPUP_RESULT.AFFIRMATIVE;
+            }
+            return Boolean(result);
+        } catch (_) {}
+    }
+
     if (ctx && typeof ctx.callGenericPopup === 'function' && ctx.POPUP_TYPE && ctx.POPUP_TYPE.CONFIRM !== undefined) {
         try {
             const result = await ctx.callGenericPopup(message, ctx.POPUP_TYPE.CONFIRM);
             if (ctx.POPUP_RESULT && ctx.POPUP_RESULT.AFFIRMATIVE !== undefined) {
-                return result === ctx.POPUP_RESULT.AFFIRMATIVE || result === true;
+                return result === ctx.POPUP_RESULT.AFFIRMATIVE;
             }
             return Boolean(result);
-        } catch (_) {
-            // 回退到浏览器原生 confirm
-        }
+        } catch (_) {}
     }
 
     if (typeof window !== 'undefined' && typeof window.confirm === 'function') {

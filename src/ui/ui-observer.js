@@ -81,41 +81,19 @@ export function findPromptManagerContainer() {
     if ($regexPanel.length > 0) return $regexPanel;
 
     const primarySelectors = [
-        '#quick_prompts_container',
-        '#quickPromptEditor',
-        '#quick-prompts-inline-drawer',
+        '#quick-edit-container',
         '#completion_prompt_manager_list',
-        '#prompt_manager_list',
-        '.prompt_manager_list',
         '#completion_prompt_manager',
-        '#left-nav-panel .prompt_manager',
     ];
     for (const sel of primarySelectors) {
         const $el = jQuery(sel).first();
         if ($el.length > 0) return $el;
     }
 
-    let $quickPromptDrawer = null;
-    jQuery('.inline-drawer-header').each(function () {
-        if ($quickPromptDrawer) return;
-        const text = jQuery(this).text().trim();
-        if (/快速提示词|Quick Prompt|Prompt Editor/i.test(text)) {
-            const $drawer = jQuery(this).closest('.inline-drawer');
-            if ($drawer.length > 0) {
-                $quickPromptDrawer = $drawer.first();
-            }
-        }
-    });
-    if ($quickPromptDrawer && $quickPromptDrawer.length > 0) {
-        return $quickPromptDrawer;
-    }
-
     const fallbackSelectors = [
+        '#openai_api-presets',
         '#top_p_block',
-        '[data-param="top_p"]',
-        '#range_block_top_p',
-        '#ai_response_configuration',
-        '#openai_settings',
+        '#range_block_openai',
         '#left-nav-panel .scrollableInner',
     ];
     for (const sel of fallbackSelectors) {
@@ -315,12 +293,12 @@ export function injectUI() {
             $container.before($bar);
         } else if (
             $container.is(
-                '#quick_prompts_container, #quickPromptEditor, #quick-prompts-inline-drawer, .inline-drawer, #completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
+                '#quick-edit-container, #completion_prompt_manager_list'
             )
         ) {
             $container.before($bar);
-        } else if ($container.is('#top_p_block, [data-param="top_p"], #range_block_top_p')) {
-            const $block = $container.closest('.range-block, .range_block, .completions_block_inner');
+        } else if ($container.is('#top_p_block, #range_block_openai')) {
+            const $block = $container.closest('.range-block, .range_block');
             if ($block.length > 0) {
                 $block.after($bar);
             } else {

@@ -30,7 +30,7 @@ export function getCurrentPresetName() {
     } catch (_) {}
 
     if (typeof jQuery !== 'undefined') {
-        const $sel = jQuery('#settings_preset_openai, #settings_preset').first();
+        const $sel = jQuery('#settings_preset_openai').first();
         if ($sel.length > 0) {
             const text = $sel.find('option:selected').text().trim();
             if (text) return text;
@@ -124,36 +124,26 @@ export async function switchToPreset(presetName, chatIdAtStart = null) {
     try {
         try {
             const pm = getChatCompletionPresetManager();
-            if (pm) {
-                if (typeof pm.selectPreset === 'function') {
-                    let targetValue = presetName;
-                    if (typeof pm.findPreset === 'function') {
-                        const foundValue = pm.findPreset(presetName);
-                        if (foundValue !== undefined && foundValue !== null && foundValue !== false) {
-                            targetValue = foundValue;
+            if (pm && typeof pm.selectPreset === 'function' && typeof pm.findPreset === 'function') {
+                let targetValue = pm.findPreset(presetName);
+
+                if ((targetValue === undefined || targetValue === null) && typeof pm.getAllPresets === 'function') {
+                    const allPresets = pm.getAllPresets();
+                    if (Array.isArray(allPresets)) {
+                        const matchedPresetName = allPresets.find((name) => isPresetNameMatch(name, presetName));
+                        if (matchedPresetName) {
+                            targetValue = pm.findPreset(matchedPresetName);
                         }
                     }
-                    await pm.selectPreset(targetValue);
+                }
+
+                if (targetValue !== undefined && targetValue !== null && targetValue !== false) {
+                    pm.selectPreset(targetValue);
                     const applied = await waitForPresetApplied(presetName, chatIdAtStart);
                     if (applied) {
                         console.debug(LOG_PREFIX, `Switched preset via PresetManager to "${presetName}"`);
                         return true;
                     }
-                }
-
-                const altMethods = [
-                    typeof pm.selectPresetByName === 'function' ? pm.selectPresetByName : null,
-                    typeof pm.changePreset === 'function' ? pm.changePreset : null,
-                ].filter(Boolean);
-
-                for (const method of altMethods) {
-                    try {
-                        await method.call(pm, presetName);
-                        if (await waitForPresetApplied(presetName, chatIdAtStart)) {
-                            console.debug(LOG_PREFIX, `Switched preset via PresetManager fallback to "${presetName}"`);
-                            return true;
-                        }
-                    } catch (_) {}
                 }
             }
         } catch (e) {
@@ -161,7 +151,7 @@ export async function switchToPreset(presetName, chatIdAtStart = null) {
         }
 
         if (typeof jQuery !== 'undefined') {
-            const $sel = jQuery('#settings_preset_openai, #settings_preset').first();
+            const $sel = jQuery('#settings_preset_openai').first();
             if ($sel.length > 0) {
                 let matchedVal = null;
                 $sel.find('option').each(function () {
@@ -181,29 +171,15 @@ export async function switchToPreset(presetName, chatIdAtStart = null) {
                     });
                 }
 
-                if (matchedVal !== null) {
+                if (matchedVal !== null && matchedVal !== undefined) {
                     $sel.val(matchedVal).trigger('change');
                     const applied = await waitForPresetApplied(presetName, chatIdAtStart);
-                    console.debug(LOG_PREFIX, `Switched preset via DOM <select> to "${presetName}" (applied=${applied})`);
+                    console.debug(LOG_PREFIX, `Switched preset via DOM #settings_preset_openai to "${presetName}" (applied=${applied})`);
                     if (applied) return true;
                 } else {
-                    console.warn(LOG_PREFIX, `Preset "${presetName}" not found in <select> options.`);
+                    console.warn(LOG_PREFIX, `Preset "${presetName}" not found in #settings_preset_openai options.`);
                 }
             }
-        }
-
-        try {
-            const ctx = getCtxSafe();
-            const escapedName = String(presetName).replace(/"/g, '\\"');
-            if (ctx && typeof ctx.executeSlashCommandsWithOptions === 'function') {
-                await ctx.executeSlashCommandsWithOptions(`/preset "${escapedName}"`);
-                if (await waitForPresetApplied(presetName, chatIdAtStart)) return true;
-            } else if (ctx && typeof ctx.executeSlashCommands === 'function') {
-                await ctx.executeSlashCommands(`/preset "${escapedName}"`);
-                if (await waitForPresetApplied(presetName, chatIdAtStart)) return true;
-            }
-        } catch (e) {
-            console.warn(LOG_PREFIX, `Slash command preset switch failed for "${presetName}":`, e);
         }
 
         return false;
@@ -220,41 +196,13 @@ export async function refreshPromptManagerUI() {
             openaiModule.promptManager &&
             typeof openaiModule.promptManager.render === 'function'
         ) {
-            openaiModule.promptManager.render();
-            console.debug(LOG_PREFIX, 'Refreshed UI via /scripts/openai.js promptManager.render()');
+            openaiModule.promptManager.render(false);
+            console.debug(LOG_PREFIX, 'Refreshed UI via openai.js promptManager.render(false)');
             return;
         }
     } catch (e) {
-        console.warn(LOG_PREFIX, 'openaiModule.promptManager.render() failed:', e);
+        console.warn(LOG_PREFIX, 'openaiModule.promptManager.render(false) failed:', e);
     }
-
-    if (typeof window !== 'undefined' && window.promptManager && typeof window.promptManager.render === 'function') {
-        try {
-            window.promptManager.render();
-            console.debug(LOG_PREFIX, 'Refreshed UI via window.promptManager.render()');
-            return;
-        } catch (e) {
-            console.warn(LOG_PREFIX, 'promptManager.render() failed:', e);
-        }
-    }
-
-    try {
-        const ctx = getCtxSafe();
-        const pm = ctx ? (ctx.promptManager || (ctx.chatCompletionSettings && ctx.chatCompletionSettings.promptManager)) : null;
-        if (pm && typeof pm.render === 'function') {
-            pm.render();
-            console.debug(LOG_PREFIX, 'Refreshed UI via context promptManager.render()');
-            return;
-        }
-    } catch (_) {}
-
-    if (typeof jQuery !== 'undefined') {
-        try {
-            jQuery(document).trigger('promptManagerUpdated');
-        } catch (_) {}
-    }
-
-    console.debug(LOG_PREFIX, 'UI refresh attempted via fallback');
 }
 
 export async function refreshPromptManagerUIUntilStable(savedState, chatIdAtStart = null) {

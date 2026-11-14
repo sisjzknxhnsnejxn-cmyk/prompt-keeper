@@ -178,17 +178,20 @@ export function getBestRestoreSlotName(state, requestedSlotName = null, currentP
 
 function getSlotBackupStorages() {
     const adapters = [];
-    try {
-        const ctx = getCtxSafe();
-        if (
-            ctx &&
-            ctx.accountStorage &&
-            typeof ctx.accountStorage.getItem === 'function' &&
-            typeof ctx.accountStorage.setItem === 'function'
-        ) {
-            adapters.push(ctx.accountStorage);
-        }
-    } catch (_) {}
+    // 仅在 SillyTavern 完成用户存储初始化后访问 accountStorage，避免触发 "AccountStorage not ready" 警告
+    if (runtimeState.promptKeeperAppReadyHandled) {
+        try {
+            const ctx = getCtxSafe();
+            if (
+                ctx &&
+                ctx.accountStorage &&
+                typeof ctx.accountStorage.getItem === 'function' &&
+                typeof ctx.accountStorage.setItem === 'function'
+            ) {
+                adapters.push(ctx.accountStorage);
+            }
+        } catch (_) {}
+    }
     try {
         if (typeof window !== 'undefined' && window.localStorage) {
             adapters.push(window.localStorage);

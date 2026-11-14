@@ -140,23 +140,22 @@ export function applyOrderFromIdentifierList(oaiSettings, savedOrder, currentIde
 }
 
 /**
- * DOM 回退：直接向页面 DOM 复选框应用启用状态（使用属性字典索引，避免特殊字符破坏 CSS 选择器）
+ * DOM 回退：直接向页面 `#completion_prompt_manager_list` 的 `.prompt-manager-toggle-action` 应用启用状态
+ * 严格对齐 SillyTavern `public/scripts/PromptManager.js` 的真实 DOM 与原生 click 处理器。
  */
 export function applyPromptStatesDOM(savedPrompts, skipped) {
     if (typeof jQuery === 'undefined' || !savedPrompts) return;
 
-    const $container = jQuery(
-        '#completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
-    ).first();
+    const $container = jQuery('#completion_prompt_manager_list').first();
     if ($container.length === 0) {
-        console.warn(LOG_PREFIX, 'DOM container not found for apply.');
+        console.warn(LOG_PREFIX, 'DOM container #completion_prompt_manager_list not found for apply.');
         return;
     }
 
     const rowByIdentifier = new Map();
-    $container.find('[data-pm-identifier], [data-prompt-id]').each(function () {
+    $container.find('li.completion_prompt_manager_prompt[data-pm-identifier], [data-pm-identifier]').each(function () {
         const $row = jQuery(this);
-        const id = $row.attr('data-pm-identifier') || $row.attr('data-prompt-id');
+        const id = $row.attr('data-pm-identifier');
         if (id && !rowByIdentifier.has(id)) {
             rowByIdentifier.set(id, $row);
         }
@@ -169,9 +168,12 @@ export function applyPromptStatesDOM(savedPrompts, skipped) {
             continue;
         }
 
-        const $checkbox = $row.find('input[type="checkbox"]').first();
-        if ($checkbox.length > 0 && Boolean($checkbox.prop('checked')) !== Boolean(enabled)) {
-            $checkbox.prop('checked', Boolean(enabled)).trigger('change');
+        const $toggle = $row.find('.prompt-manager-toggle-action').first();
+        if ($toggle.length > 0) {
+            const currentlyEnabled = $toggle.hasClass('fa-toggle-on') && !$toggle.hasClass('fa-toggle-off');
+            if (Boolean(currentlyEnabled) !== Boolean(enabled) && $toggle[0]) {
+                $toggle[0].click();
+            }
         }
     }
 

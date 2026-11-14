@@ -32,36 +32,33 @@ export function normalizePromptOrderEnabled(promptOrder, prompts) {
 }
 
 /**
- * DOM 回退：从页面 Prompt Manager 列表 DOM 中读取条目开关与顺序
+ * DOM 回退：从页面 Prompt Manager 列表 DOM（`#completion_prompt_manager_list`）中读取条目开关与顺序
+ * 严格对齐 SillyTavern `public/scripts/PromptManager.js` 的真实 DOM 结构：
+ * - 列表项：`li.completion_prompt_manager_prompt[data-pm-identifier]`（禁用态含 `completion_prompt_manager_prompt_disabled`）
+ * - 切换按钮：`.prompt-manager-toggle-action`（启用含 `fa-toggle-on`，禁用含 `fa-toggle-off`）
  */
 export function readPromptStatesFromDOM() {
     if (typeof jQuery === 'undefined') return null;
 
-    const $container = jQuery(
-        '#completion_prompt_manager_list, #prompt_manager_list, .prompt_manager_list'
-    ).first();
+    const $container = jQuery('#completion_prompt_manager_list').first();
     if ($container.length === 0) {
-        console.debug(LOG_PREFIX, 'DOM container not found for fallback read.');
+        console.debug(LOG_PREFIX, 'DOM container #completion_prompt_manager_list not found for fallback read.');
         return null;
     }
 
     const prompts = {};
     const orderArray = [];
 
-    $container.find('[data-pm-identifier], [data-prompt-id]').each(function () {
+    $container.find('li.completion_prompt_manager_prompt[data-pm-identifier], [data-pm-identifier]').each(function () {
         const $row = jQuery(this);
-        const identifier = $row.attr('data-pm-identifier') || $row.attr('data-prompt-id');
+        const identifier = $row.attr('data-pm-identifier');
         if (!identifier) return;
 
-        const $checkbox = $row.find('input[type="checkbox"]').first();
-        if ($checkbox.length > 0) {
-            prompts[identifier] = Boolean($checkbox.prop('checked'));
+        const $toggle = $row.find('.prompt-manager-toggle-action').first();
+        if ($toggle.length > 0) {
+            prompts[identifier] = $toggle.hasClass('fa-toggle-on') && !$toggle.hasClass('fa-toggle-off');
         } else {
-            const $toggle = $row.find('.prompt_manager_prompt_toggle');
-            if ($toggle.length > 0) {
-                prompts[identifier] =
-                    $toggle.hasClass('enabled') || $toggle.attr('data-enabled') === 'true';
-            }
+            prompts[identifier] = !$row.hasClass('completion_prompt_manager_prompt_disabled');
         }
 
         orderArray.push(identifier);

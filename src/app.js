@@ -39,8 +39,6 @@ export function unbindPromptKeeperEventListeners() {
         try {
             if (binding.eventSource && typeof binding.eventSource.removeListener === 'function') {
                 binding.eventSource.removeListener(binding.eventName, binding.handler);
-            } else if (binding.eventSource && typeof binding.eventSource.off === 'function') {
-                binding.eventSource.off(binding.eventName, binding.handler);
             }
         } catch (_) {}
     }
@@ -74,7 +72,8 @@ export function initPromptKeeper(attempt = 0) {
     }
 
     const ctx = getCtxSafe();
-    if (!ctx || !ctx.eventSource || !ctx.event_types) {
+    const eventTypes = ctx ? (ctx.eventTypes || ctx.event_types) : null;
+    if (!ctx || !ctx.eventSource || !eventTypes) {
         if (attempt < 30) {
             runtimeState.initRetryTimer = setTimeout(() => {
                 runtimeState.initRetryTimer = null;
@@ -89,7 +88,8 @@ export function initPromptKeeper(attempt = 0) {
     if (runtimeState.promptKeeperEventHandlersBound) return;
     runtimeState.promptKeeperEventHandlersBound = true;
 
-    const { eventSource, event_types } = ctx;
+    const { eventSource } = ctx;
+    const event_types = eventTypes;
 
     const ensureUIMounted = (source = 'init') => {
         loadPluginSettings();
@@ -199,23 +199,11 @@ export function initPromptKeeper(attempt = 0) {
 
     if (typeof jQuery !== 'undefined') {
         jQuery(document)
-            .off('promptManagerUpdated.promptkeeper')
-            .on('promptManagerUpdated.promptkeeper', () => {
-                if (!isPluginEnabled() || runtimeState.promptKeeperRefreshingUI) return;
-                runtimeState.promptKeeperRefreshingUI = true;
-                try {
-                    scheduleEnsurePromptKeeperUI('promptManagerUpdated');
-                } finally {
-                    runtimeState.promptKeeperRefreshingUI = false;
-                }
-            });
-
-        jQuery(document)
-            .off('change.promptkeeperPreset', '#settings_preset_openai, #settings_preset, #main_api')
-            .on('change.promptkeeperPreset', '#settings_preset_openai, #settings_preset, #main_api', function () {
+            .off('change.promptkeeperPreset', '#settings_preset_openai, #main_api')
+            .on('change.promptkeeperPreset', '#settings_preset_openai, #main_api', function () {
                 if (!isPluginEnabled()) return;
                 const elId = this && this.id ? this.id : '';
-                if (elId === 'settings_preset_openai' || elId === 'settings_preset') {
+                if (elId === 'settings_preset_openai') {
                     onUserPresetChanged(`dom_change:${elId}`);
                 }
                 scheduleEnsurePromptKeeperUI('presetOrApiSelectChange');
