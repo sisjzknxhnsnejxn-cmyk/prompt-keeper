@@ -2,6 +2,17 @@
 
 All notable changes to **Prompt Keeper** are documented in this file.
 
+## [v2.2.6] - 2026-11-14
+
+### 🐛 Critical Bug Fix & iOS Mobile Adaptation
+- **修复 `v2.2.5` 模块静态导入断裂导致整个插件界面消失的问题**：
+  - 在 `src/core/prompt-reader.js` 中恢复导出 `normalizePromptOrderEnabled(promptOrder, prompts)`，修复 `src/core/prompt-applier.js` 静态导入缺失引起的 ES Module `SyntaxError: Importing binding name 'normalizePromptOrderEnabled' is not found`，恢复预设状态栏与扩展设置面板的正常加载。
+- **iOS Safari / iPadOS 移动端深度适配优化**：
+  - **修复移动端媒体查询选择器断层**：同步修正 `style.css` 中 `@media (max-width: 480px)`、`@media (max-width: 360px)`、`@media (pointer: coarse)` 等响应式规则的按钮选择器（覆盖 `.pk-bar-btn` 与 `.prompt-keeper-btn`），恢复 iPhone 端 ≥44px Apple HIG 触控高度、三列等宽网格布局与触屏防 `:hover` 粘滞样式。
+  - **新增 iOS 抽屉事件驱动自愈挂载**：在 `src/ui/ui-observer.js` 中支持 `MutationObserver` 目标容器脱钩自动重连与启动期延迟重试，并在用户点击酒馆顶栏抽屉图标（`#leftNavDrawerIcon`、`#extensionsMenuButton`、`.drawer-icon` 等）时按需触发挂载校验，后台零轮询且打开抽屉必现。
+  - **优化 iOS 软键盘 `visualViewport` 输入弹窗定位与原生滚动兼容性**：修复小屏 iPhone 软键盘弹起时输入弹窗被 `18vh` 二次挤压的问题；将 `overscroll-behavior-y: none` 收敛至 `html, body` 根层级，避免干扰酒馆抽屉与聊天区域的 iOS 原生惯性滚动。
+  - **增强 iOS / iPadOS 设备识别与触控手势状态清理**：在 `src/utils/dom-events.js` 中支持 iPadOS 桌面级 UA（`Macintosh` + `maxTouchPoints > 1`）检测，并在 `pointerup` / `touchend` 后自动清理残留触摸起点，确保连续点按灵敏可靠。
+
 ## [v2.2.5] - 2026-11-14
 
 ### 🛡️ Anti-Refresh & Memory/CPU Footprint Optimization

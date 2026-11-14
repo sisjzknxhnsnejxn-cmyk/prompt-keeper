@@ -15,6 +15,27 @@ export function getPromptItemIdentifier(item) {
 }
 
 /**
+ * 将 prompts 开关状态同步规范化到 prompt_order 数组中
+ */
+export function normalizePromptOrderEnabled(promptOrder, prompts) {
+    if (!Array.isArray(promptOrder) || !prompts || typeof prompts !== 'object') {
+        return promptOrder;
+    }
+
+    for (const entry of promptOrder) {
+        if (!entry || !Array.isArray(entry.order)) continue;
+        for (const item of entry.order) {
+            if (!item || typeof item !== 'object' || !item.identifier) continue;
+            if (hasOwnSlot(prompts, item.identifier)) {
+                item.enabled = Boolean(prompts[item.identifier]);
+            }
+        }
+    }
+
+    return promptOrder;
+}
+
+/**
  * 将 prompt_order 瘦身为仅含必要字段与必要分组的紧凑结构，
  * 避免多角色冗余 order 数组及额外字段导致单个槽位膨胀至数百 KB。
  */

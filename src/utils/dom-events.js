@@ -5,12 +5,30 @@
 import { INTERACTION_DEBOUNCE_MS, TOUCH_MOVE_THRESHOLD_PX } from '../config/constants.js';
 
 /**
+ * 检测当前设备是否为 iOS / iPadOS 设备（兼容 iPadOS 13+ 桌面级 Macintosh UA）
+ */
+export function isIOSDevice() {
+    try {
+        if (typeof navigator === 'undefined') return false;
+        const ua = String(navigator.userAgent || '');
+        const platform = String(navigator.platform || '');
+        if (/iPad|iPhone|iPod/i.test(ua) || /iPad|iPhone|iPod/i.test(platform)) {
+            return true;
+        }
+        return /Macintosh|MacIntel/i.test(ua + ' ' + platform) && Number(navigator.maxTouchPoints || 0) > 1;
+    } catch (_) {
+        return false;
+    }
+}
+
+/**
  * 检测当前设备是否为粗指针（触屏/iOS/移动端）设备
  */
 export function pkIsCoarsePointerDevice() {
     try {
         if (typeof window === 'undefined') return false;
         return Boolean(
+            isIOSDevice() ||
             (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
             (typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0)) ||
             'ontouchstart' in window
