@@ -17,6 +17,7 @@ import { runtimeState } from '../config/runtime-state.js';
 import { pkScheduleIdleTask } from '../utils/dom-events.js';
 import { hasOwnSlot, isSafeSlotName, normalizePresetKey, normalizeSlotName } from '../utils/format.js';
 import { getCtxSafe, persistChatMetadata } from '../utils/st-context.js';
+import { compactPromptOrder } from './prompt-reader.js';
 import { loadPluginSettings, savePluginSettings } from './settings.js';
 
 function sanitizeSingleSlot(slot, fallbackSlotName = '') {
@@ -30,7 +31,7 @@ function sanitizeSingleSlot(slot, fallbackSlotName = '') {
     }
     return {
         prompts: cleanPrompts,
-        promptOrder: Array.isArray(slot.promptOrder) ? slot.promptOrder : null,
+        promptOrder: Array.isArray(slot.promptOrder) ? compactPromptOrder(slot.promptOrder, cleanPrompts) : null,
         presetName: slot.presetName || fallbackSlotName,
         savedAt: Number(slot.savedAt) || 0,
     };

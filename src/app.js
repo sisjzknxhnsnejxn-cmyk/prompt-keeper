@@ -5,10 +5,12 @@
 import { LOG_PREFIX, PLUGIN_VERSION } from './config/constants.js';
 import { resetRuntimeState, runtimeState } from './config/runtime-state.js';
 import {
+    applyPageRefreshProtection,
     cleanupLegacyAccountStorage,
     isPluginEnabled,
     loadPluginSettings,
     syncPluginSettingsWithServer,
+    teardownPageRefreshProtection,
 } from './core/settings.js';
 import { invalidateSlotsBackupCache } from './core/state-migration.js';
 import { onChatChanged, onUserPresetChanged } from './services/auto-restore-service.js';
@@ -24,11 +26,13 @@ import { closeSlotPickerModal } from './ui/slot-picker-modal.js';
 import { updateStatusDisplay } from './ui/status-bar.js';
 import {
     bindPromptKeeperButtonDelegation,
+    bindVisibilityHibernation,
     ensurePCUIWatchdog,
     scheduleEnsurePromptKeeperUI,
     startUIObserver,
     tryInjectUI,
     unbindPromptKeeperButtonDelegation,
+    unbindVisibilityHibernation,
 } from './ui/ui-observer.js';
 import { getCtxSafe } from './utils/st-context.js';
 
@@ -61,6 +65,8 @@ export function destroyPromptKeeper() {
     clearSettingsRetryTimer();
     unbindPromptKeeperEventListeners();
     unbindPromptKeeperButtonDelegation();
+    unbindVisibilityHibernation();
+    teardownPageRefreshProtection();
     closeInputModal();
     closeSlotPickerModal();
     resetRuntimeState();
@@ -99,9 +105,11 @@ export function initPromptKeeper(attempt = 0) {
 
     const ensureUIMounted = (source = 'init') => {
         loadPluginSettings();
+        applyPageRefreshProtection();
         tryInjectSettingsPanel(0);
         syncSettingsPanelUI();
         bindPromptKeeperButtonDelegation();
+        bindVisibilityHibernation();
 
         if (isPluginEnabled()) {
             tryInjectUI(0);
@@ -116,6 +124,7 @@ export function initPromptKeeper(attempt = 0) {
         runtimeState.promptKeeperAppReadyHandled = true;
 
         syncPluginSettingsWithServer();
+        applyPageRefreshProtection();
         invalidateSlotsBackupCache();
         cleanupLegacyAccountStorage();
         ensureUIMounted('appReady');
@@ -156,6 +165,7 @@ export function initPromptKeeper(attempt = 0) {
     if (event_types.SETTINGS_LOADED_AFTER) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED_AFTER, () => {
             syncPluginSettingsWithServer();
+            applyPageRefreshProtection();
             invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
@@ -167,6 +177,7 @@ export function initPromptKeeper(attempt = 0) {
     if (event_types.EXTENSION_SETTINGS_LOADED) {
         registerEventSourceListener(eventSource, event_types.EXTENSION_SETTINGS_LOADED, () => {
             syncPluginSettingsWithServer();
+            applyPageRefreshProtection();
             invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
@@ -178,6 +189,7 @@ export function initPromptKeeper(attempt = 0) {
     if (event_types.SETTINGS_LOADED) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED, () => {
             syncPluginSettingsWithServer();
+            applyPageRefreshProtection();
             invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
@@ -225,6 +237,7 @@ export function initPromptKeeper(attempt = 0) {
             .off('click.promptkeeperDrawer touchend.promptkeeperDrawer', '#ai-config-button, #leftNavDrawerIcon, #left-nav-panel .drawer-toggle')
             .on('click.promptkeeperDrawer touchend.promptkeeperDrawer', '#ai-config-button, #leftNavDrawerIcon, #left-nav-panel .drawer-toggle', () => {
                 if (!isPluginEnabled()) return;
+                startUIObserver();
                 scheduleEnsurePromptKeeperUI('drawerOpen');
             });
     }

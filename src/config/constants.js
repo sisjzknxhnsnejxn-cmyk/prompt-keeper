@@ -4,7 +4,7 @@
  */
 
 export const EXTENSION_NAME = 'prompt-keeper';
-export const PLUGIN_VERSION = '2.2.4';
+export const PLUGIN_VERSION = '2.2.5';
 export const LOG_PREFIX = '[PromptKeeper]';
 export const METADATA_KEY = 'promptKeeperState';
 export const SETTINGS_KEY = 'promptKeeperPluginSettings';
@@ -12,14 +12,16 @@ export const SETTINGS_BACKUP_STORAGE_KEY = 'promptKeeper_settings_backup_v1';
 export const SLOTS_BACKUP_STORAGE_KEY = 'promptKeeper_slots_backup_v2';
 export const METADATA_VERSION = 2;
 export const MAX_SLOTS_PER_CHAT = 5;
-export const MAX_BACKUP_CHATS = 25;
-export const MAX_GLOBAL_SLOTS = 20;
+export const MAX_BACKUP_CHATS = 15;
+export const MAX_GLOBAL_SLOTS = 15;
 export const DEFAULT_AUTO_RESTORE_DELAY_MS = 1500;
 
 export const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
     autoRestore: true,
     customSaveName: false,
+    preventPullToRefresh: true,
+    confirmBeforeUnload: false,
     autoRestoreDelay: DEFAULT_AUTO_RESTORE_DELAY_MS,
     slotPickerTheme: 'light',
 });
@@ -35,8 +37,8 @@ export const AUTO_RESTORE_RETRY_DELAY_MS = 1800;
 
 export const OBSERVER_REINJECTION_LIMIT = 10;
 export const OBSERVER_REINJECTION_WINDOW = 30000;
-export const UI_ENSURE_DELAYS_MS = Object.freeze([0, 300, 1000, 2000]);
-export const PC_UI_WATCHDOG_INTERVAL_MS = 2500;
+export const UI_ENSURE_DELAYS_MS = Object.freeze([0, 350, 1200]);
+export const PC_UI_WATCHDOG_INTERVAL_MS = 15000;
 
 export const BUTTON_DEBOUNCE_MS = 400;
 export const UI_REINJECT_SETTLE_MS = 600;

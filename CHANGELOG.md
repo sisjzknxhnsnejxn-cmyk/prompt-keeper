@@ -2,6 +2,23 @@
 
 All notable changes to **Prompt Keeper** are documented in this file.
 
+## [v2.2.5] - 2026-11-14
+
+### 🛡️ Anti-Refresh & Memory/CPU Footprint Optimization
+- **全局触摸监听改为被动模式（Passive Touch Listeners）**：
+  - 将 `document` 上的 `pointerdown`、`touchstart`、`pointermove`、`touchmove`、`pointercancel`、`touchcancel` 滑动识别监听器全部升级为 `{ capture: true, passive: true }`，彻底消除手机端滚动聊天记录或流式输出时阻塞浏览器合成器线程（Compositor Thread）引发的卡死与看门狗强制刷新。
+- **严禁 `MutationObserver` 回退监听 `document.body`**：
+  - 仅限定监听左侧预设面板容器（`#left-nav-panel` / `#completion_prompt_manager` / `#rm_api_block`），杜绝在聊天消息流式生成和美化正则渲染时产生高频 DOM 变动回调。
+- **后台深度休眠机制（Visibility Hibernation）**：
+  - 监听 `visibilitychange` 与 `pagehide` 事件；当页面切入后台或锁屏（`document.hidden === true`）时立即断开 `MutationObserver` 并清除所有定时器，实现后台**零 CPU 唤醒**，大幅降低 iOS Safari（Jetsam）与 Android 浏览器杀后台重载的概率；切回前台时无缝恢复。
+  - 将 PC 端看门狗轮询间隔调整为 15 秒低频轻量检查，仅在扩展设置面板未挂载时尝试注入。
+- **预设顺序快照瘦身（Compact `promptOrder`）**：
+  - 新增 `compactPromptOrder()`，自动剥离 `prompt_order` 中的多角色历史冗余分组与多余属性，仅保留当前激活角色分组及默认分组的 `{ identifier, enabled }` 最小集；老存档在读取或迁移时也会自动瘦身，单槽位体积减少 70%~90%。
+  - 将本地备份上限收敛为 `MAX_BACKUP_CHATS = 15`、`MAX_GLOBAL_SLOTS = 15`。
+- **新增「防止手机端下拉误触刷新页面」与「刷新/关闭前确认拦截」设置**：
+  - 默认开启「防止手机端下拉误触刷新页面」（通过 `overscroll-behavior-y: none` 阻止滑动到顶部时触发浏览器下拉刷新）。
+  - 支持在扩展设置中按需开启「刷新或关闭页面前弹出确认拦截」（`beforeunload` 二次确认保护）。
+
 ## [v2.2.4] - 2026-11-14
 
 ### 🐛 Bug Fixes & Startup Stability

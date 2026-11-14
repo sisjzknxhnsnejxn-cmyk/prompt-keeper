@@ -4,7 +4,11 @@
 
 import { DEFAULT_AUTO_RESTORE_DELAY_MS, LOG_PREFIX } from '../config/constants.js';
 import { runtimeState } from '../config/runtime-state.js';
-import { loadPluginSettings, savePluginSettings } from '../core/settings.js';
+import {
+    applyPageRefreshProtection,
+    loadPluginSettings,
+    savePluginSettings,
+} from '../core/settings.js';
 import { closeSlotPickerModal } from './slot-picker-modal.js';
 import { updateStatusDisplay } from './status-bar.js';
 import { buildSettingsPanelHTML } from './templates.js';
@@ -25,6 +29,8 @@ export function syncSettingsPanelUI() {
     jQuery('#pk-setting-enabled').prop('checked', settings.enabled !== false);
     jQuery('#pk-setting-auto-restore').prop('checked', settings.autoRestore !== false);
     jQuery('#pk-setting-custom-save-name').prop('checked', settings.customSaveName === true);
+    jQuery('#pk-setting-prevent-pull-refresh').prop('checked', settings.preventPullToRefresh !== false);
+    jQuery('#pk-setting-confirm-unload').prop('checked', settings.confirmBeforeUnload === true);
 
     const $delayInput = jQuery('#pk-setting-delay');
     if ($delayInput.length > 0 && document.activeElement !== $delayInput[0]) {
@@ -55,6 +61,7 @@ export function injectSettingsPanel() {
         const s = loadPluginSettings();
         s.enabled = jQuery(this).prop('checked');
         savePluginSettings();
+        applyPageRefreshProtection();
 
         const $bar = jQuery('#prompt-keeper-bar');
         if (s.enabled) {
@@ -89,6 +96,20 @@ export function injectSettingsPanel() {
         const s = loadPluginSettings();
         s.customSaveName = jQuery(this).prop('checked');
         savePluginSettings();
+    });
+
+    jQuery('#pk-setting-prevent-pull-refresh').on('change', function () {
+        const s = loadPluginSettings();
+        s.preventPullToRefresh = jQuery(this).prop('checked');
+        savePluginSettings();
+        applyPageRefreshProtection();
+    });
+
+    jQuery('#pk-setting-confirm-unload').on('change', function () {
+        const s = loadPluginSettings();
+        s.confirmBeforeUnload = jQuery(this).prop('checked');
+        savePluginSettings();
+        applyPageRefreshProtection();
     });
 
     jQuery('#pk-setting-delay').on('change', function () {

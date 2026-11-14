@@ -15,20 +15,67 @@ export function getPromptItemIdentifier(item) {
 }
 
 /**
- * 将 prompts 映射表中的 enabled 状态同步到 prompt_order 数组中
+ * 将 prompt_order 瘦身为仅含必要字段与必要分组的紧凑结构，
+ * 避免多角色冗余 order 数组及额外字段导致单个槽位膨胀至数百 KB。
  */
-export function normalizePromptOrderEnabled(promptOrder, prompts) {
-    if (!Array.isArray(promptOrder) || !prompts) return;
+export function compactPromptOrder(rawPromptOrder, promptsMap = null, activeCharacterId = null) {
+    if (!Array.isArray(rawPromptOrder) || rawPromptOrder.length === 0) return null;
 
-    for (const entry of promptOrder) {
-        if (!entry || !Array.isArray(entry.order)) continue;
-        for (const item of entry.order) {
-            if (!item || typeof item !== 'object' || !item.identifier) continue;
-            if (hasOwnSlot(prompts, item.identifier)) {
-                item.enabled = prompts[item.identifier];
+    // 情况 1：DOM 回退读取的扁平字符串/对象数组
+    const first = rawPromptOrder[0];
+    if (typeof first === 'string' || (first && typeof first === 'object' && !Array.isArray(first.order) && first.identifier)) {
+        const flat = [];
+        for (const item of rawPromptOrder) {
+            const id = getPromptItemIdentifier(item);
+            if (typeof id === 'string' && id) {
+                flat.push(id);
             }
         }
+        return flat.length > 0 ? flat : null;
     }
+
+    // 情况 2：SillyTavern 标准 [{ character_id, order: [{ identifier, enabled }] }]
+    const validEntries = rawPromptOrder.filter(e => e && Array.isArray(e.order) && e.order.length > 0);
+    if (validEntries.length === 0) return null;
+
+    let selectedEntries = validEntries;
+    if (validEntries.length > 2) {
+        const picked = [];
+        const addUnique = (entry) => {
+            if (entry && !picked.includes(entry)) picked.push(entry);
+        };
+        if (activeCharacterId !== null && activeCharacterId !== undefined) {
+            addUnique(validEntries.find(e => String(e.character_id) === String(activeCharacterId)));
+        }
+        addUnique(validEntries.find(e => Number(e.character_id) === 100001));
+        addUnique(validEntries.find(e => Number(e.character_id) === 100000));
+        addUnique(validEntries[0]);
+        selectedEntries = picked.slice(0, 2);
+    }
+
+    const compacted = [];
+    for (const entry of selectedEntries) {
+        const cleanOrder = [];
+        for (const item of entry.order) {
+            const id = getPromptItemIdentifier(item);
+            if (typeof id !== 'string' || !id) continue;
+            const enabled =
+                promptsMap && hasOwnSlot(promptsMap, id)
+                    ? Boolean(promptsMap[id])
+                    : item && typeof item === 'object'
+                      ? item.enabled !== false
+                      : true;
+            cleanOrder.push({ identifier: id, enabled });
+        }
+        if (cleanOrder.length > 0) {
+            compacted.push({
+                character_id: entry.character_id !== undefined ? entry.character_id : 100001,
+                order: cleanOrder,
+            });
+        }
+    }
+
+    return compacted.length > 0 ? compacted : null;
 }
 
 /**
@@ -108,8 +155,8 @@ export function readPromptStates() {
 
             let promptOrder = null;
             if (Array.isArray(oaiSettings.prompt_order)) {
-                promptOrder = JSON.parse(JSON.stringify(oaiSettings.prompt_order));
-                normalizePromptOrderEnabled(promptOrder, prompts);
+                const activeChId = ctx && ctx.characterId !== undefined ? ctx.characterId : null;
+                promptOrder = compactPromptOrder(oaiSettings.prompt_order, prompts, activeChId);
             }
 
             if (Object.keys(prompts).length > 0) {

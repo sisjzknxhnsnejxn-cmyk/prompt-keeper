@@ -13,6 +13,70 @@ import { getCtxSafe } from '../utils/st-context.js';
 
 let inMemorySettings = null;
 let legacyAccountStorageCleaned = false;
+let beforeUnloadBound = false;
+
+function handleBeforeUnloadGuard(event) {
+    try {
+        const s = loadPluginSettings();
+        if (s.enabled === false || !s.confirmBeforeUnload) return undefined;
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+    } catch (_) {
+        return undefined;
+    }
+}
+
+/**
+ * 根据当前插件配置同步应用或移除「防下拉刷新」与「防意外刷新/离开页面」保护
+ */
+export function applyPageRefreshProtection() {
+    try {
+        const s = loadPluginSettings();
+        const pluginActive = s.enabled !== false;
+        const enablePullGuard = pluginActive && s.preventPullToRefresh !== false;
+        const enableUnloadGuard = pluginActive && s.confirmBeforeUnload === true;
+
+        if (typeof document !== 'undefined') {
+            if (document.documentElement && document.documentElement.classList) {
+                document.documentElement.classList.toggle('pk-prevent-pull-to-refresh', enablePullGuard);
+            }
+            if (document.body && document.body.classList) {
+                document.body.classList.toggle('pk-prevent-pull-to-refresh', enablePullGuard);
+            }
+        }
+
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            if (enableUnloadGuard && !beforeUnloadBound) {
+                window.addEventListener('beforeunload', handleBeforeUnloadGuard);
+                beforeUnloadBound = true;
+            } else if (!enableUnloadGuard && beforeUnloadBound) {
+                window.removeEventListener('beforeunload', handleBeforeUnloadGuard);
+                beforeUnloadBound = false;
+            }
+        }
+    } catch (_) {}
+}
+
+/**
+ * 卸载插件时移除所有页面级防刷新保护
+ */
+export function teardownPageRefreshProtection() {
+    try {
+        if (typeof document !== 'undefined') {
+            if (document.documentElement && document.documentElement.classList) {
+                document.documentElement.classList.remove('pk-prevent-pull-to-refresh');
+            }
+            if (document.body && document.body.classList) {
+                document.body.classList.remove('pk-prevent-pull-to-refresh');
+            }
+        }
+        if (beforeUnloadBound && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+            window.removeEventListener('beforeunload', handleBeforeUnloadGuard);
+            beforeUnloadBound = false;
+        }
+    } catch (_) {}
+}
 
 function getLocalStorageSafe() {
     try {
@@ -72,6 +136,16 @@ function sanitizeSettingsObject(raw, fallback = DEFAULT_SETTINGS) {
         autoRestore: src.autoRestore !== undefined ? Boolean(src.autoRestore) : Boolean(base.autoRestore),
         customSaveName:
             src.customSaveName !== undefined ? Boolean(src.customSaveName) : Boolean(base.customSaveName),
+        preventPullToRefresh:
+            src.preventPullToRefresh !== undefined
+                ? Boolean(src.preventPullToRefresh)
+                : base.preventPullToRefresh !== undefined
+                  ? Boolean(base.preventPullToRefresh)
+                  : DEFAULT_SETTINGS.preventPullToRefresh,
+        confirmBeforeUnload:
+            src.confirmBeforeUnload !== undefined
+                ? Boolean(src.confirmBeforeUnload)
+                : Boolean(base.confirmBeforeUnload),
         autoRestoreDelay: delay,
         slotPickerTheme: theme,
     };
@@ -106,6 +180,9 @@ export function writeSettingsBackupToStorage(settings) {
         enabled: Boolean(settings.enabled),
         autoRestore: Boolean(settings.autoRestore),
         customSaveName: Boolean(settings.customSaveName),
+        preventPullToRefresh:
+            settings.preventPullToRefresh !== undefined ? Boolean(settings.preventPullToRefresh) : true,
+        confirmBeforeUnload: Boolean(settings.confirmBeforeUnload),
         autoRestoreDelay: Number(settings.autoRestoreDelay) || DEFAULT_SETTINGS.autoRestoreDelay,
         slotPickerTheme: ['dark', 'light'].includes(settings.slotPickerTheme)
             ? settings.slotPickerTheme
@@ -137,6 +214,8 @@ export function loadPluginSettings() {
             existingServerObj.enabled = merged.enabled;
             existingServerObj.autoRestore = merged.autoRestore;
             existingServerObj.customSaveName = merged.customSaveName;
+            existingServerObj.preventPullToRefresh = merged.preventPullToRefresh;
+            existingServerObj.confirmBeforeUnload = merged.confirmBeforeUnload;
             existingServerObj.autoRestoreDelay = merged.autoRestoreDelay;
             existingServerObj.slotPickerTheme = merged.slotPickerTheme;
             if (merged.slotsBackup && !existingServerObj.slotsBackup) {
@@ -181,6 +260,8 @@ export function syncPluginSettingsWithServer() {
         serverSettings.enabled = merged.enabled;
         serverSettings.autoRestore = merged.autoRestore;
         serverSettings.customSaveName = merged.customSaveName;
+        serverSettings.preventPullToRefresh = merged.preventPullToRefresh;
+        serverSettings.confirmBeforeUnload = merged.confirmBeforeUnload;
         serverSettings.autoRestoreDelay = merged.autoRestoreDelay;
         serverSettings.slotPickerTheme = merged.slotPickerTheme;
         inMemorySettings = serverSettings;

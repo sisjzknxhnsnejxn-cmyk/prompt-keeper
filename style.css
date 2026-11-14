@@ -1,5 +1,15 @@
 /* Prompt Keeper Styles */
 
+html.pk-prevent-pull-to-refresh,
+body.pk-prevent-pull-to-refresh,
+body.pk-prevent-pull-to-refresh #chat,
+body.pk-prevent-pull-to-refresh #left-nav-panel,
+body.pk-prevent-pull-to-refresh #right-nav-panel,
+body.pk-prevent-pull-to-refresh .drawer-content,
+body.pk-prevent-pull-to-refresh .scrollableInner {
+    overscroll-behavior-y: none !important;
+}
+
 .prompt-keeper-bar {
     display: flex;
     flex-wrap: wrap;

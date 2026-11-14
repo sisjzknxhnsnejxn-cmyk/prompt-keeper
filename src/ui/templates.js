@@ -63,6 +63,18 @@ export function buildSettingsPanelHTML(settings) {
                 <span>保存时自定义槽位名称</span>
             </label>
         </div>
+        <div class="pk-setting-row">
+            <label class="checkbox_label" for="pk-setting-prevent-pull-refresh">
+                <input id="pk-setting-prevent-pull-refresh" type="checkbox" ${settings.preventPullToRefresh !== false ? 'checked' : ''} />
+                <span>防止手机端下拉误触刷新页面</span>
+            </label>
+        </div>
+        <div class="pk-setting-row">
+            <label class="checkbox_label" for="pk-setting-confirm-unload">
+                <input id="pk-setting-confirm-unload" type="checkbox" ${settings.confirmBeforeUnload ? 'checked' : ''} />
+                <span>刷新或关闭页面前弹出确认拦截</span>
+            </label>
+        </div>
         <div class="pk-setting-row pk-setting-row-inline">
             <label for="pk-setting-delay">自动恢复延迟 (ms)</label>
             <input id="pk-setting-delay" type="number" class="text_pole" min="300" max="5000" step="100" value="${settings.autoRestoreDelay}" style="width:92px;" />

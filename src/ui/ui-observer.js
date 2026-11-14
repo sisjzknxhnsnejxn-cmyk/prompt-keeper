@@ -156,6 +156,9 @@ export async function runPromptKeeperButtonAction(buttonElement, event) {
     }
 }
 
+const PASSIVE_CAPTURE_OPTIONS = { capture: true, passive: true };
+let visibilityListenersBound = false;
+
 function handleDocumentTouchStart(event) {
     recordTouchStart(runtimeState, event);
 }
@@ -182,17 +185,18 @@ function handleDocumentPromptKeeperButtonEvent(event) {
 
 /**
  * 绑定统一的 document 级按钮委托监听（避免捕获阶段与直绑监听器双重绑定冲突）
+ * 所有触摸/指针滑动轨迹监听全部标记为 passive: true，绝不阻塞移动端合成器滚动线程。
  */
 export function bindPromptKeeperButtonDelegation() {
     if (typeof document === 'undefined' || !document.addEventListener) return;
 
     if (!runtimeState.documentTouchTrackingBound) {
-        document.addEventListener('pointerdown', handleDocumentTouchStart, true);
-        document.addEventListener('touchstart', handleDocumentTouchStart, true);
-        document.addEventListener('pointermove', handleDocumentTouchMove, true);
-        document.addEventListener('touchmove', handleDocumentTouchMove, true);
-        document.addEventListener('pointercancel', handleDocumentTouchCancel, true);
-        document.addEventListener('touchcancel', handleDocumentTouchCancel, true);
+        document.addEventListener('pointerdown', handleDocumentTouchStart, PASSIVE_CAPTURE_OPTIONS);
+        document.addEventListener('touchstart', handleDocumentTouchStart, PASSIVE_CAPTURE_OPTIONS);
+        document.addEventListener('pointermove', handleDocumentTouchMove, PASSIVE_CAPTURE_OPTIONS);
+        document.addEventListener('touchmove', handleDocumentTouchMove, PASSIVE_CAPTURE_OPTIONS);
+        document.addEventListener('pointercancel', handleDocumentTouchCancel, PASSIVE_CAPTURE_OPTIONS);
+        document.addEventListener('touchcancel', handleDocumentTouchCancel, PASSIVE_CAPTURE_OPTIONS);
         runtimeState.documentTouchTrackingBound = true;
     }
 
@@ -365,16 +369,84 @@ export function scheduleEnsurePromptKeeperUI(reason = 'event') {
 }
 
 
+export function stopUIObserverAndWatchdog() {
+    if (runtimeState.uiObserver) {
+        try {
+            runtimeState.uiObserver.disconnect();
+        } catch (_) {}
+        runtimeState.uiObserver = null;
+    }
+    if (runtimeState.observerThrottleTimer) {
+        clearTimeout(runtimeState.observerThrottleTimer);
+        runtimeState.observerThrottleTimer = null;
+    }
+    if (runtimeState.observerRafId && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(runtimeState.observerRafId);
+        runtimeState.observerRafId = null;
+    }
+    if (runtimeState.pcUIWatchdogTimer) {
+        clearInterval(runtimeState.pcUIWatchdogTimer);
+        runtimeState.pcUIWatchdogTimer = null;
+    }
+}
+
+function handleVisibilityChange() {
+    if (typeof document === 'undefined') return;
+    if (document.hidden) {
+        clearUIEnsureTimers();
+        stopUIObserverAndWatchdog();
+        return;
+    }
+    if (isPluginEnabled()) {
+        startUIObserver();
+        ensurePCUIWatchdog();
+        if (typeof jQuery !== 'undefined' && jQuery('#prompt-keeper-bar').length === 0) {
+            injectUI();
+        }
+    }
+}
+
+function handlePageHide() {
+    clearUIEnsureTimers();
+    stopUIObserverAndWatchdog();
+}
+
+export function bindVisibilityHibernation() {
+    if (visibilityListenersBound || typeof document === 'undefined' || !document.addEventListener) return;
+    document.addEventListener('visibilitychange', handleVisibilityChange, { passive: true });
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('pagehide', handlePageHide, { passive: true });
+    }
+    visibilityListenersBound = true;
+}
+
+export function unbindVisibilityHibernation() {
+    if (!visibilityListenersBound) return;
+    if (typeof document !== 'undefined' && document.removeEventListener) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('pagehide', handlePageHide);
+    }
+    visibilityListenersBound = false;
+}
+
 export function ensurePCUIWatchdog() {
     if (runtimeState.pcUIWatchdogTimer) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
 
     runtimeState.pcUIWatchdogTimer = setInterval(() => {
         if (runtimeState.observerPaused) return;
-        if (typeof document !== 'undefined' && document.hidden) return;
+        if (typeof document !== 'undefined' && document.hidden) {
+            stopUIObserverAndWatchdog();
+            return;
+        }
 
-        try {
-            injectSettingsPanel();
-        } catch (_) {}
+        if (typeof jQuery !== 'undefined' && jQuery('#prompt-keeper-settings').length === 0) {
+            try {
+                injectSettingsPanel();
+            } catch (_) {}
+        }
 
         if (!isPluginEnabled()) return;
 
@@ -394,12 +466,14 @@ export function ensurePCUIWatchdog() {
 
 export function startUIObserver() {
     if (runtimeState.uiObserver || typeof MutationObserver === 'undefined') return;
+    if (typeof document !== 'undefined' && document.hidden) return;
 
+    // 严禁回退监听 document.body，防止聊天流式输出/美化正则重绘引发海量 Mutation 回调导致卡顿或崩溃刷新
     const targetNode =
         document.getElementById('left-nav-panel') ||
         document.getElementById('completion_prompt_manager') ||
-        document.getElementById('rm_api_block') ||
-        document.body;
+        document.getElementById('rm_api_block');
+    if (!targetNode) return;
 
     if (!runtimeState.dragListenersBound && typeof jQuery !== 'undefined') {
         runtimeState.dragListenersBound = true;
