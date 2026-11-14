@@ -26,15 +26,18 @@ import {
     shouldSuppressSyntheticClick,
 } from '../utils/dom-events.js';
 import { hasOwnSlot } from '../utils/format.js';
-import { bindIOSModalViewportAndScrollLock } from './input-modal.js';
+import {
+    bindIOSModalViewportAndScrollLock,
+    bindModalBackdropIsolationAndDismiss,
+} from './input-modal.js';
 
-const MODAL_OPEN_GUARD_MS = 350;
+const MODAL_OPEN_GUARD_MS = 380;
 const INLINE_CONFIRM_TIMEOUT_MS = 3000;
 
 function renderThemeToggleContent(isLight) {
     return isLight
-        ? '<i class="fa-solid fa-sun"></i><span>日间</span>'
-        : '<i class="fa-solid fa-moon"></i><span>夜间</span>';
+        ? '<i class="fa-solid fa-sun"></i>'
+        : '<i class="fa-solid fa-moon"></i>';
 }
 
 export function closeSlotPickerModal() {
@@ -73,26 +76,24 @@ export function openSlotPickerModal(mode = 'restore') {
     const $backdrop = jQuery(
         `<div id="prompt-keeper-slot-modal" class="pk-slot-modal-backdrop pk-modal-overlay ${themeClass}" role="dialog" aria-modal="true"></div>`
     );
-    const $dialog = jQuery('<div class="pk-slot-modal pk-modal-card"></div>');
-    const $grabber = jQuery('<div class="pk-sheet-grabber" aria-hidden="true"></div>');
+    const $dialog = jQuery('<div class="pk-slot-modal"></div>');
     const titleText = mode === 'delete' ? '管理预设槽位' : '预设槽位';
 
     const $header = jQuery('<div class="pk-slot-modal-header"></div>');
     const $headerTitleWrap = jQuery('<div class="pk-slot-modal-title-wrap"></div>');
     $headerTitleWrap.append(
-        jQuery('<span class="pk-modal-title-icon"><i class="fa-solid fa-layer-group"></i></span>'),
         jQuery('<div class="pk-slot-modal-title"></div>').text(titleText),
         jQuery('<span class="pk-slot-count-pill"></span>').text(
-            `${entries.length}/${MAX_SLOTS_PER_CHAT}`
+            `${entries.length} / ${MAX_SLOTS_PER_CHAT}`
         )
     );
 
     const $headerTools = jQuery('<div class="pk-slot-modal-tools"></div>');
     const $themeBtn = jQuery(
-        `<button type="button" class="pk-slot-theme-btn" title="切换日间 / 夜间模式">${renderThemeToggleContent(isLightTheme)}</button>`
+        `<button type="button" class="pk-slot-theme-btn pk-icon-only-btn" title="切换日间 / 夜间模式">${renderThemeToggleContent(isLightTheme)}</button>`
     );
     const $closeBtn = jQuery(
-        '<button type="button" class="pk-slot-close-btn" title="关闭"><i class="fa-solid fa-xmark"></i></button>'
+        '<button type="button" class="pk-slot-close-btn" title="关闭" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>'
     );
     $headerTools.append($themeBtn, $closeBtn);
     $header.append($headerTitleWrap, $headerTools);
@@ -108,7 +109,7 @@ export function openSlotPickerModal(mode = 'restore') {
         );
         const $nameRow = jQuery('<div class="pk-slot-name-row"></div>');
         const $titleGroup = jQuery('<div class="pk-slot-title-group"></div>');
-        $titleGroup.append(jQuery('<span class="pk-slot-name"></span>').text(slotName));
+        $titleGroup.append(jQuery('<span class="pk-slot-name"></span>').text(slotName).attr('title', slotName));
 
         const $badges = jQuery('<div class="pk-slot-badges"></div>');
         if (isCurrentPreset) {
@@ -136,7 +137,7 @@ export function openSlotPickerModal(mode = 'restore') {
         }
 
         const $deleteSlotBtn = jQuery(
-            '<button type="button" class="pk-slot-icon-tool pk-slot-delete-tool" title="删除槽位"><i class="fa-solid fa-trash-can"></i><span class="pk-delete-confirm-label">确认</span></button>'
+            '<button type="button" class="pk-slot-icon-tool pk-slot-delete-tool" title="删除槽位"><i class="fa-solid fa-trash-can"></i><span class="pk-delete-confirm-label">删除</span></button>'
         );
         $deleteSlotBtn.attr('data-pk-slot-action', 'delete').attr('data-pk-slot-name', slotName);
 
@@ -146,12 +147,12 @@ export function openSlotPickerModal(mode = 'restore') {
         const $actions = jQuery('<div class="pk-slot-actions"></div>');
 
         const $restoreSlotBtn = jQuery(
-            '<button type="button" class="pk-slot-action-btn pk-slot-action-primary" title="切换到该预设并恢复条目"><i class="fa-solid fa-rotate-left"></i><span>恢复</span></button>'
+            '<button type="button" class="pk-slot-action-btn pk-slot-action-primary" title="切换到该预设并恢复条目"><span>恢复</span></button>'
         );
         $restoreSlotBtn.attr('data-pk-slot-action', 'restore').attr('data-pk-slot-name', slotName);
 
         const $applyCurrentBtn = jQuery(
-            '<button type="button" class="pk-slot-action-btn pk-slot-action-secondary" title="保持当前预设，仅套用条目开关"><i class="fa-solid fa-sliders"></i><span>仅套用条目</span></button>'
+            '<button type="button" class="pk-slot-action-btn pk-slot-action-secondary" title="保持当前预设，仅套用条目开关"><span>仅套用条目</span></button>'
         );
         $applyCurrentBtn
             .attr('data-pk-slot-action', 'apply-current')
@@ -164,7 +165,7 @@ export function openSlotPickerModal(mode = 'restore') {
 
     const $footer = jQuery('<div class="pk-slot-modal-footer"></div>');
     const $clearAllBtn = jQuery(
-        '<button type="button" class="pk-slot-clear-all-btn"><i class="fa-solid fa-trash-can"></i><span class="pk-clear-all-text">清空全部</span></button>'
+        '<button type="button" class="pk-slot-clear-all-btn"><span class="pk-clear-all-text">清空全部</span></button>'
     );
     const $cancelBtn = jQuery(
         '<button type="button" class="pk-slot-cancel-btn"><span>关闭</span></button>'
@@ -180,7 +181,7 @@ export function openSlotPickerModal(mode = 'restore') {
 
     const modalInteractionEvents = pkGetButtonEventTypes().join(' ');
 
-    $backdrop.on('pointerdown touchstart mousedown', () => {
+    $dialog.on('pointerdown touchstart mousedown', () => {
         hasModalPointerDownAfterOpen = true;
     });
 
@@ -307,31 +308,24 @@ export function openSlotPickerModal(mode = 'restore') {
         if (shouldSuppressSyntheticClick(this, e.type)) return;
         markTouchHandledForSyntheticClick(this, e.type);
         if (!shouldHandleInteraction(this)) return;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
         closeSlotPickerModal();
     };
 
     $closeBtn.on(modalInteractionEvents, handleCloseModal);
     $cancelBtn.on(modalInteractionEvents, handleCloseModal);
-    $backdrop.on(modalInteractionEvents, function (e) {
-        const resolvedTarget = resolveEventElement(e) || e.target;
-        if (resolvedTarget === $backdrop[0] || e.target === $backdrop[0]) {
-            if (isGhostEventFromModalTrigger(e)) return;
-            if (isTouchScrollGesture(runtimeState, e)) return;
-            if (shouldSuppressSyntheticClick(this, e.type)) return;
-            markTouchHandledForSyntheticClick(this, e.type);
-            if (!shouldHandleInteraction(this)) return;
-            e.preventDefault();
-            closeSlotPickerModal();
-        }
-    });
 
     $footer.append($clearAllBtn, $cancelBtn);
-    $dialog.append($grabber, $header, $list, $footer);
+    $dialog.append($header, $list, $footer);
     $backdrop.append($dialog);
     jQuery('body').append($backdrop);
 
+    const backdropDismissCleanup = bindModalBackdropIsolationAndDismiss(
+        $backdrop,
+        modalOpenedAt,
+        () => closeSlotPickerModal()
+    );
     const iosCleanup = bindIOSModalViewportAndScrollLock($backdrop, '.pk-slot-list');
     const onKeyDown = (e) => {
         if (e.key === 'Escape') {
@@ -344,6 +338,7 @@ export function openSlotPickerModal(mode = 'restore') {
     }
     runtimeState.modalEscapeCleanup = () => {
         clearAllConfirmTimers();
+        backdropDismissCleanup();
         iosCleanup();
         if (typeof document !== 'undefined') {
             document.removeEventListener('keydown', onKeyDown);

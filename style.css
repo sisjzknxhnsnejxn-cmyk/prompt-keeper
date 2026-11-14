@@ -155,223 +155,9 @@
     border: 1px solid rgba(128, 128, 128, 0.24);
 }
 
-/* Slot picker modal */
-#prompt-keeper-modal.pk-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 20000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    min-height: 100dvh;
-    min-height: 100svh;
-    overflow-y: auto;
-    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-    background: rgba(0, 0, 0, 0.55);
-    touch-action: manipulation;
-    -webkit-touch-callout: none;
-    box-sizing: border-box;
-    animation: pk-modal-fade-in 0.16s ease-out;
-}
-
-#prompt-keeper-modal .pk-modal-card {
-    width: min(420px, calc(100vw - 32px));
-    max-width: 100%;
-    max-height: min(72vh, 560px);
-    max-height: min(72dvh, 560px);
-    max-height: min(72svh, 560px);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px;
-    border: 1px solid var(--SmartThemeBorderColor, #666);
-    border-radius: 12px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-    overflow: hidden;
-    box-sizing: border-box;
-    transform: translateY(0) scale(1);
-    animation: pk-modal-pop-in 0.18s ease-out;
-    transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
-}
-
-#prompt-keeper-modal.pk-modal-dark .pk-modal-card {
-    background: #111;
-    color: #f3f3f3;
-}
-
-#prompt-keeper-modal.pk-modal-light .pk-modal-card {
-    background: #f7f7f7;
-    color: #111;
-}
-
-.pk-modal-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-width: 0;
-}
-
-.pk-modal-header strong {
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.pk-modal-theme,
-.pk-modal-cancel,
-.pk-slot-item {
-    -webkit-appearance: none;
-    appearance: none;
-    border: 0;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-touch-callout: none;
-    user-select: none;
-    -webkit-user-select: none;
-    transition: opacity 0.12s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
-}
-
-.pk-modal-theme {
-    flex: 0 0 auto;
-    padding: 6px 10px;
-    min-height: 36px;
-    border-radius: 999px;
-    background: var(--SmartThemeQuoteColor, #555);
-    color: #fff;
-    font-size: 0.85em;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-}
-
-.pk-modal-theme:hover,
-.pk-modal-cancel:hover,
-.pk-slot-item:hover {
-    background-color: rgba(127, 127, 127, 0.22);
-}
-
-.pk-modal-theme:focus-visible,
-.pk-modal-cancel:focus-visible,
-.pk-slot-item:focus-visible {
-    outline: 2px solid var(--SmartThemeQuoteColor, #8ab4ff);
-    outline-offset: 2px;
-}
-
-.pk-modal-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    overflow: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    padding-right: 2px;
-    min-height: 0;
-}
-
-.pk-slot-item {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-    width: 100%;
-    min-height: 44px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: rgba(127, 127, 127, 0.12);
-    color: inherit;
-    text-align: left;
-    box-sizing: border-box;
-    contain: content;
-}
-
-.pk-slot-item:active,
-.pk-slot-item.pk-btn-active,
-.pk-modal-cancel:active,
-.pk-modal-cancel.pk-btn-active,
-.pk-modal-theme:active,
-.pk-modal-theme.pk-btn-active {
-    transform: translateY(1px) scale(0.98);
-    opacity: 0.85;
-}
-
-.pk-slot-item.pk-slot-working {
-    box-shadow: inset 3px 0 0 var(--SmartThemeQuoteColor, #8ab4ff), 0 6px 16px rgba(0, 0, 0, 0.16);
-}
-
-.pk-slot-item.pk-slot-disabled {
-    cursor: wait;
-    opacity: 0.55;
-}
-
-.pk-slot-delete {
-    border: 1px solid rgba(220, 60, 60, 0.45);
-    background: rgba(220, 60, 60, 0.08);
-}
-
-.pk-slot-main {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-}
-
-.pk-slot-name {
-    min-width: 0;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-}
-
-.pk-slot-default {
-    flex: 0 0 auto;
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: var(--SmartThemeQuoteColor, #555);
-    color: #fff;
-    font-size: 0.7em;
-}
-
-.pk-slot-time {
-    color: var(--SmartThemeBodyColor, #aaa);
-    font-size: 0.82em;
-    line-height: 1.35;
-    overflow-wrap: anywhere;
-}
-
-.pk-modal-cancel {
-    margin-top: auto;
-    padding: 10px 12px;
-    min-height: 44px;
-    border-radius: 10px;
-    background: rgba(127, 127, 127, 0.18);
-    color: inherit;
-    font-weight: 600;
-}
-
-@keyframes pk-modal-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes pk-modal-pop-in {
-    from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.98);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
     .prompt-keeper-bar,
-    .prompt-keeper-btn-group .menu_button,
-    #prompt-keeper-modal.pk-modal-overlay,
-    #prompt-keeper-modal .pk-modal-card,
-    .pk-modal-theme,
-    .pk-modal-cancel,
-    .pk-slot-item {
+    .prompt-keeper-btn-group .menu_button {
         animation: none;
         transition: none;
     }
@@ -426,59 +212,6 @@
     .prompt-keeper-btn-group .menu_button span {
         white-space: nowrap;
     }
-
-    #prompt-keeper-modal.pk-modal-overlay {
-        align-items: center;
-        justify-content: center;
-        padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-        background: rgba(0, 0, 0, 0.5);
-    }
-
-    #prompt-keeper-modal .pk-modal-card {
-        width: min(100%, 420px);
-        max-height: calc(88vh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom))));
-        max-height: calc(88dvh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom))));
-        max-height: calc(88svh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom))));
-        border-radius: 20px;
-        padding: 16px;
-        gap: 12px;
-    }
-
-    .pk-modal-header {
-        gap: 10px;
-    }
-
-    .pk-modal-header strong {
-        font-size: 1.05em;
-    }
-
-    .pk-modal-theme {
-        min-height: 40px;
-        padding: 8px 11px;
-        font-size: 0.9em;
-    }
-
-    .pk-modal-list {
-        gap: 10px;
-        padding-right: 0;
-    }
-
-    .pk-slot-item {
-        min-height: 52px;
-        padding: 12px 13px;
-        border-radius: 14px;
-        font-size: 16px;
-    }
-
-    .pk-slot-time {
-        font-size: 0.86em;
-    }
-
-    .pk-modal-cancel {
-        min-height: 48px;
-        border-radius: 14px;
-        font-size: 16px;
-    }
 }
 
 @media (max-width: 360px) {
@@ -490,17 +223,11 @@
 }
 
 @media (pointer: coarse) {
-    .prompt-keeper-btn-group .menu_button,
-    .pk-modal-theme,
-    .pk-modal-cancel,
-    .pk-slot-item {
+    .prompt-keeper-btn-group .menu_button {
         -webkit-tap-highlight-color: rgba(255, 255, 255, 0.12);
     }
 
-    .prompt-keeper-btn-group .menu_button:hover,
-    .pk-modal-theme:hover,
-    .pk-modal-cancel:hover,
-    .pk-slot-item:hover {
+    .prompt-keeper-btn-group .menu_button:hover {
         transform: none;
         box-shadow: none;
     }
@@ -509,45 +236,6 @@
 @media (min-width: 481px) and (max-width: 900px) {
     .prompt-keeper-btn-group .menu_button {
         min-height: 42px;
-    }
-
-    #prompt-keeper-modal .pk-modal-card {
-        width: min(460px, calc(100vw - 48px));
-    }
-}
-
-@media (max-height: 520px) and (orientation: landscape) {
-    #prompt-keeper-modal.pk-modal-overlay {
-        align-items: stretch;
-        padding-top: max(8px, env(safe-area-inset-top));
-        padding-bottom: max(8px, env(safe-area-inset-bottom));
-    }
-
-    #prompt-keeper-modal .pk-modal-card {
-        max-height: calc(100vh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
-        max-height: calc(100dvh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
-        max-height: calc(100svh - max(16px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 8px)));
-    }
-}
-
-@supports not (height: 100dvh) {
-    #prompt-keeper-modal.pk-modal-overlay {
-        min-height: 100vh;
-        min-height: -webkit-fill-available;
-    }
-
-    #prompt-keeper-modal .pk-modal-card {
-        max-height: min(70vh, 560px);
-    }
-
-    @media (max-width: 480px) {
-        #prompt-keeper-modal.pk-modal-overlay {
-            min-height: 100vh;
-        }
-
-        #prompt-keeper-modal .pk-modal-card {
-            max-height: calc(100vh - 48px);
-        }
     }
 }
 
@@ -578,53 +266,45 @@
     border-radius: 7px;
 }
 
-/* Unified Minimalist Modals (#prompt-keeper-slot-modal & #prompt-keeper-input-modal) */
+/* Minimalist Tactile Modals (#prompt-keeper-slot-modal & #prompt-keeper-input-modal) */
 @keyframes pkModalFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
 @keyframes pkCardPopIn {
-    from { opacity: 0; transform: translateY(10px) scale(0.975); }
+    from { opacity: 0; transform: translateY(6px) scale(0.985); }
     to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes pkSheetSlideUp {
-    from { opacity: 0.6; transform: translateY(34px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 #prompt-keeper-slot-modal.pk-slot-modal-backdrop,
 #prompt-keeper-input-modal.pk-slot-modal-backdrop {
-    --pk-overlay-bg: rgba(10, 14, 24, 0.56);
-    --pk-card-bg: #151922;
-    --pk-card-text: #f1f5f9;
-    --pk-card-muted: #94a3b8;
-    --pk-card-border: rgba(255, 255, 255, 0.09);
-    --pk-card-shadow: 0 24px 60px rgba(0, 0, 0, 0.54), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-    --pk-slot-bg: #1d222e;
-    --pk-slot-border: rgba(255, 255, 255, 0.07);
-    --pk-slot-active-bg: rgba(79, 70, 229, 0.12);
-    --pk-slot-active-border: rgba(129, 140, 248, 0.42);
-    --pk-btn-bg: #262c3a;
-    --pk-btn-hover-bg: #30384a;
-    --pk-btn-border: rgba(255, 255, 255, 0.1);
-    --pk-primary-bg: linear-gradient(180deg, #5b52f0 0%, #4f46e5 100%);
-    --pk-primary-hover: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%);
-    --pk-primary-border: rgba(129, 140, 248, 0.35);
-    --pk-primary-text: #ffffff;
-    --pk-primary-shadow: 0 2px 8px rgba(79, 70, 229, 0.32);
+    --pk-overlay-bg: rgba(9, 9, 11, 0.56);
+    --pk-card-bg: #18181b;
+    --pk-card-text: #f4f4f5;
+    --pk-card-muted: #a1a1aa;
+    --pk-card-border: rgba(255, 255, 255, 0.08);
+    --pk-card-shadow: 0 20px 48px rgba(0, 0, 0, 0.52), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    --pk-slot-bg: #202024;
+    --pk-slot-border: rgba(255, 255, 255, 0.06);
+    --pk-slot-active-bg: #242429;
+    --pk-slot-active-border: rgba(255, 255, 255, 0.22);
+    --pk-btn-bg: #27272a;
+    --pk-btn-hover-bg: #323236;
+    --pk-btn-border: rgba(255, 255, 255, 0.08);
+    --pk-primary-bg: #f4f4f5;
+    --pk-primary-hover: #e4e4e7;
+    --pk-primary-border: transparent;
+    --pk-primary-text: #18181b;
+    --pk-primary-shadow: none;
     --pk-danger: #f87171;
-    --pk-danger-bg: rgba(248, 113, 113, 0.11);
-    --pk-danger-border: rgba(248, 113, 113, 0.26);
-    --pk-danger-solid: #ef4444;
-    --pk-pill-bg: rgba(255, 255, 255, 0.08);
-    --pk-icon-accent-bg: rgba(99, 102, 241, 0.16);
-    --pk-icon-accent-color: #818cf8;
-    --pk-input-bg: #11141c;
-    --pk-input-border: rgba(255, 255, 255, 0.14);
-    --pk-input-focus: #6366f1;
-    --pk-grabber-bg: rgba(255, 255, 255, 0.22);
+    --pk-danger-bg: rgba(248, 113, 113, 0.1);
+    --pk-danger-border: rgba(248, 113, 113, 0.22);
+    --pk-danger-solid: #dc2626;
+    --pk-pill-bg: rgba(255, 255, 255, 0.07);
+    --pk-input-bg: #121215;
+    --pk-input-border: rgba(255, 255, 255, 0.12);
+    --pk-input-focus: rgba(244, 244, 245, 0.42);
     position: fixed;
     inset: 0;
     width: 100%;
@@ -637,14 +317,14 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     background: var(--pk-overlay-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     overscroll-behavior: contain;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    animation: pkModalFadeIn 0.16s ease-out;
+    animation: pkModalFadeIn 0.14s ease-out;
 }
 
 #prompt-keeper-input-modal.pk-slot-modal-backdrop {
@@ -653,72 +333,60 @@
 
 #prompt-keeper-slot-modal.pk-slot-theme-light,
 #prompt-keeper-input-modal.pk-slot-theme-light {
-    --pk-overlay-bg: rgba(15, 23, 42, 0.32);
-    --pk-card-bg: #ffffff;
-    --pk-card-text: #0f172a;
-    --pk-card-muted: #64748b;
-    --pk-card-border: rgba(15, 23, 42, 0.08);
-    --pk-card-shadow: 0 22px 54px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.06);
-    --pk-slot-bg: #f8fafc;
-    --pk-slot-border: rgba(15, 23, 42, 0.07);
-    --pk-slot-active-bg: rgba(79, 70, 229, 0.045);
-    --pk-slot-active-border: rgba(79, 70, 229, 0.32);
+    --pk-overlay-bg: rgba(24, 24, 27, 0.34);
+    --pk-card-bg: #fcfcfb;
+    --pk-card-text: #18181b;
+    --pk-card-muted: #71717a;
+    --pk-card-border: rgba(24, 24, 27, 0.08);
+    --pk-card-shadow: 0 18px 42px rgba(24, 24, 27, 0.14), 0 1px 3px rgba(24, 24, 27, 0.05);
+    --pk-slot-bg: #f4f4f2;
+    --pk-slot-border: rgba(24, 24, 27, 0.06);
+    --pk-slot-active-bg: #efefec;
+    --pk-slot-active-border: rgba(24, 24, 27, 0.24);
     --pk-btn-bg: #ffffff;
-    --pk-btn-hover-bg: #f1f5f9;
-    --pk-btn-border: #e2e8f0;
-    --pk-primary-bg: linear-gradient(180deg, #5850ec 0%, #4f46e5 100%);
-    --pk-primary-hover: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%);
-    --pk-primary-border: #4338ca;
-    --pk-primary-text: #ffffff;
-    --pk-primary-shadow: 0 2px 6px rgba(79, 70, 229, 0.24);
+    --pk-btn-hover-bg: #f4f4f5;
+    --pk-btn-border: rgba(24, 24, 27, 0.1);
+    --pk-primary-bg: #18181b;
+    --pk-primary-hover: #27272a;
+    --pk-primary-border: transparent;
+    --pk-primary-text: #fafafa;
+    --pk-primary-shadow: none;
     --pk-danger: #dc2626;
-    --pk-danger-bg: rgba(239, 68, 68, 0.06);
-    --pk-danger-border: rgba(239, 68, 68, 0.22);
+    --pk-danger-bg: rgba(220, 38, 38, 0.06);
+    --pk-danger-border: rgba(220, 38, 38, 0.18);
     --pk-danger-solid: #dc2626;
-    --pk-pill-bg: #f1f5f9;
-    --pk-icon-accent-bg: rgba(79, 70, 229, 0.1);
-    --pk-icon-accent-color: #4f46e5;
-    --pk-input-bg: #f8fafc;
-    --pk-input-border: #cbd5e1;
-    --pk-input-focus: #4f46e5;
-    --pk-grabber-bg: rgba(15, 23, 42, 0.16);
+    --pk-pill-bg: rgba(24, 24, 27, 0.06);
+    --pk-input-bg: #f4f4f2;
+    --pk-input-border: rgba(24, 24, 27, 0.12);
+    --pk-input-focus: rgba(24, 24, 27, 0.38);
 }
 
 #prompt-keeper-slot-modal .pk-slot-modal,
 #prompt-keeper-input-modal .pk-slot-modal {
-    width: min(440px, 100%);
+    width: min(410px, 100%);
     max-width: 100%;
-    max-height: calc(100vh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 20px)));
-    max-height: calc(100dvh - max(28px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 20px)));
+    max-height: calc(100vh - max(32px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)));
+    max-height: calc(100dvh - max(32px, calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)));
     display: flex;
     flex-direction: column;
     gap: 14px;
     padding: 18px;
     box-sizing: border-box;
-    border-radius: 18px;
+    border-radius: 14px;
     border: 1px solid var(--pk-card-border);
     background: var(--pk-card-bg);
     color: var(--pk-card-text);
     box-shadow: var(--pk-card-shadow);
     overflow: hidden;
     contain: layout paint;
-    animation: pkCardPopIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    animation: pkCardPopIn 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
 #prompt-keeper-input-modal .pk-input-modal-card {
-    width: min(390px, 100%);
+    width: min(360px, 100%);
     gap: 14px;
-}
-
-.pk-sheet-grabber {
-    display: none;
-    width: 36px;
-    height: 4px;
-    border-radius: 999px;
-    background: var(--pk-grabber-bg);
-    margin: -4px auto 2px;
-    flex: 0 0 auto;
+    padding: 16px 18px;
 }
 
 .pk-slot-modal-header {
@@ -731,35 +399,17 @@
 
 .pk-slot-modal-title-wrap {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: 8px;
     min-width: 0;
 }
 
-.pk-modal-title-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: var(--pk-icon-accent-bg);
-    color: var(--pk-icon-accent-color);
-    font-size: 0.85em;
-    flex: 0 0 auto;
-}
-
-.pk-modal-title-icon.pk-modal-title-icon-danger {
-    background: var(--pk-danger-bg);
-    color: var(--pk-danger);
-}
-
 .pk-slot-modal-title {
     margin: 0;
-    font-size: 1.02em;
-    font-weight: 700;
+    font-size: 0.96em;
+    font-weight: 600;
     letter-spacing: -0.01em;
-    line-height: 1.3;
+    line-height: 1.35;
     color: var(--pk-card-text);
     white-space: nowrap;
     writing-mode: horizontal-tb;
@@ -768,21 +418,20 @@
 .pk-slot-count-pill {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--pk-pill-bg);
+    font-size: 0.76em;
+    font-weight: 500;
     color: var(--pk-card-muted);
-    font-size: 0.75em;
-    font-weight: 600;
-    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
     white-space: nowrap;
 }
 
 .pk-slot-modal-tools {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex: 0 0 auto;
+    margin-right: -4px;
 }
 
 .pk-slot-theme-btn,
@@ -791,53 +440,38 @@
     flex-direction: row !important;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    height: 32px;
-    padding: 0 10px;
-    border-radius: 9px;
-    border: 1px solid var(--pk-btn-border);
-    background: var(--pk-btn-bg);
-    color: var(--pk-card-text);
-    font-size: 0.8em;
-    font-weight: 600;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--pk-card-muted);
+    font-size: 0.85em;
     cursor: pointer;
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
     white-space: nowrap !important;
     writing-mode: horizontal-tb !important;
-    transition: background-color 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
-}
-
-.pk-slot-theme-btn.pk-icon-only-btn,
-.pk-slot-close-btn {
-    width: 32px;
-    padding: 0;
+    transition: background-color 0.14s ease, color 0.14s ease, transform 0.1s ease;
 }
 
 .pk-slot-theme-btn:hover,
 .pk-slot-close-btn:hover {
-    background: var(--pk-btn-hover-bg);
+    background: var(--pk-pill-bg);
+    color: var(--pk-card-text);
 }
 
 .pk-slot-theme-btn:active,
 .pk-slot-close-btn:active {
-    transform: scale(0.95);
-}
-
-.pk-slot-theme-btn i {
-    color: #f59e0b;
-}
-
-#prompt-keeper-slot-modal.pk-slot-theme-dark .pk-slot-theme-btn i,
-#prompt-keeper-input-modal.pk-slot-theme-dark .pk-slot-theme-btn i {
-    color: #fbbf24;
+    transform: scale(0.94);
 }
 
 .pk-slot-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -851,13 +485,13 @@
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    padding: 12px 13px;
-    border-radius: 14px;
+    padding: 12px;
+    border-radius: 10px;
     border: 1px solid var(--pk-slot-border);
     background: var(--pk-slot-bg);
     cursor: default;
     box-sizing: border-box;
-    transition: border-color 0.16s ease, background-color 0.16s ease;
+    transition: border-color 0.14s ease, background-color 0.14s ease;
 }
 
 #prompt-keeper-slot-modal .pk-slot-item.pk-slot-item-active {
@@ -883,8 +517,8 @@
 }
 
 .pk-slot-name {
-    font-size: 0.94em;
-    font-weight: 700;
+    font-size: 0.9em;
+    font-weight: 600;
     color: var(--pk-card-text);
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -894,47 +528,35 @@
 .pk-slot-badges {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     flex: 0 0 auto;
 }
 
 .pk-slot-badge {
     display: inline-flex;
     align-items: center;
-    padding: 1px 7px;
-    border-radius: 999px;
-    font-size: 0.72em;
-    font-weight: 600;
-    line-height: 1.35;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 500;
+    line-height: 1.4;
+    background: var(--pk-pill-bg);
+    color: var(--pk-card-muted);
     white-space: nowrap !important;
     writing-mode: horizontal-tb !important;
 }
 
 .pk-slot-badge-current {
-    background: rgba(34, 197, 94, 0.14);
-    color: #15803d;
-    border: 1px solid rgba(34, 197, 94, 0.28);
-}
-
-#prompt-keeper-slot-modal.pk-slot-theme-dark .pk-slot-badge-current {
-    color: #86efac;
-}
-
-.pk-slot-badge-default {
-    background: rgba(245, 158, 11, 0.14);
-    color: #b45309;
-    border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-#prompt-keeper-slot-modal.pk-slot-theme-dark .pk-slot-badge-default {
-    color: #fde047;
+    color: var(--pk-card-text);
+    font-weight: 600;
 }
 
 .pk-slot-quick-tools {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 2px;
     flex: 0 0 auto;
+    margin-right: -4px;
 }
 
 .pk-slot-icon-tool {
@@ -943,49 +565,50 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    height: 30px;
-    min-width: 30px;
-    padding: 0 7px;
-    border-radius: 8px;
-    border: 1px solid var(--pk-btn-border);
-    background: var(--pk-btn-bg);
+    height: 28px;
+    min-width: 28px;
+    padding: 0 6px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
     color: var(--pk-card-muted);
-    font-size: 0.78em;
-    font-weight: 600;
+    font-size: 0.76em;
+    font-weight: 500;
     cursor: pointer;
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
     white-space: nowrap !important;
     writing-mode: horizontal-tb !important;
-    transition: all 0.15s ease;
+    transition: background-color 0.14s ease, color 0.14s ease, transform 0.1s ease;
 }
 
 .pk-slot-icon-tool:hover:not(:disabled) {
-    background: var(--pk-btn-hover-bg);
+    background: var(--pk-pill-bg);
     color: var(--pk-card-text);
 }
 
 .pk-slot-icon-tool:active:not(:disabled) {
-    transform: scale(0.95);
+    transform: scale(0.94);
 }
 
 .pk-slot-star-tool.pk-is-active {
-    color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.35);
-    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
     cursor: default;
 }
 
-.pk-slot-delete-tool {
+#prompt-keeper-slot-modal.pk-slot-theme-dark .pk-slot-star-tool.pk-is-active {
+    color: #fbbf24;
+}
+
+.pk-slot-delete-tool:hover:not(:disabled) {
     color: var(--pk-danger);
-    border-color: var(--pk-danger-border);
     background: var(--pk-danger-bg);
 }
 
 .pk-slot-delete-tool .pk-delete-confirm-label {
     display: none;
-    font-size: 0.95em;
+    font-size: 0.94em;
     font-weight: 600;
 }
 
@@ -993,7 +616,7 @@
     background: var(--pk-danger-solid) !important;
     border-color: var(--pk-danger-solid) !important;
     color: #ffffff !important;
-    padding: 0 10px;
+    padding: 0 8px;
 }
 
 .pk-slot-delete-tool.pk-confirming .pk-delete-confirm-label {
@@ -1003,7 +626,7 @@
 .pk-slot-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
 }
 
@@ -1014,17 +637,17 @@
     flex-direction: row !important;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    height: 36px;
-    min-height: 36px;
+    gap: 5px;
+    height: 34px;
+    min-height: 34px;
     width: 100%;
     padding: 0 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     border: 1px solid var(--pk-btn-border);
     background: var(--pk-btn-bg);
     color: var(--pk-card-text);
-    font-size: 0.83em;
-    font-weight: 600;
+    font-size: 0.81em;
+    font-weight: 500;
     cursor: pointer;
     touch-action: manipulation;
     user-select: none;
@@ -1032,19 +655,20 @@
     white-space: nowrap !important;
     writing-mode: horizontal-tb !important;
     box-sizing: border-box;
-    transition: background 0.14s ease, border-color 0.14s ease, transform 0.1s ease, opacity 0.12s ease;
+    transition: background-color 0.14s ease, border-color 0.14s ease, transform 0.1s ease, opacity 0.12s ease;
 }
 
 .pk-slot-clear-all-btn,
 .pk-slot-cancel-btn {
     width: auto !important;
-    padding: 0 14px;
+    padding: 0 12px;
 }
 
 .pk-slot-action-btn.pk-slot-action-primary {
     background: var(--pk-primary-bg);
     border-color: var(--pk-primary-border);
     color: var(--pk-primary-text);
+    font-weight: 600;
     box-shadow: var(--pk-primary-shadow);
 }
 
@@ -1054,7 +678,7 @@
 
 .pk-slot-action-btn.pk-slot-action-muted,
 .pk-slot-action-btn:disabled {
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: default;
 }
 
@@ -1080,25 +704,37 @@
 .pk-slot-action-btn:active,
 .pk-slot-clear-all-btn:active,
 .pk-slot-cancel-btn:active {
-    transform: scale(0.975);
+    transform: scale(0.98);
 }
 
-.pk-slot-action-danger,
+.pk-slot-action-danger {
+    color: #ffffff;
+    border-color: var(--pk-danger-solid);
+    background: var(--pk-danger-solid);
+    font-weight: 600;
+}
+
+.pk-slot-action-danger:hover {
+    opacity: 0.92;
+}
+
 .pk-slot-clear-all-btn {
-    color: var(--pk-danger);
-    border-color: var(--pk-danger-border);
-    background: var(--pk-danger-bg);
+    color: var(--pk-card-muted);
+    border-color: transparent;
+    background: transparent;
+    padding: 0 8px;
 }
 
-.pk-slot-action-danger:hover,
 .pk-slot-clear-all-btn:hover {
-    background: rgba(239, 68, 68, 0.15);
+    color: var(--pk-danger);
+    background: var(--pk-danger-bg);
 }
 
 .pk-slot-clear-all-btn.pk-confirming {
     background: var(--pk-danger-solid) !important;
     border-color: var(--pk-danger-solid) !important;
     color: #ffffff !important;
+    padding: 0 12px;
 }
 
 .pk-slot-modal-footer {
@@ -1106,14 +742,14 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding-top: 10px;
+    padding-top: 8px;
     border-top: 1px solid var(--pk-slot-border);
 }
 
 .pk-input-modal-body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .pk-input-field-wrap {
@@ -1125,36 +761,41 @@
 
 .pk-input-field {
     width: 100%;
-    height: 42px;
-    padding: 0 36px 0 13px;
-    border-radius: 11px;
+    height: 40px;
+    padding: 0 34px 0 12px;
+    border-radius: 9px;
     border: 1px solid var(--pk-input-border);
     background: var(--pk-input-bg);
     color: var(--pk-card-text);
     font-size: 16px !important;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.3;
     box-sizing: border-box;
     outline: none;
     -webkit-appearance: none;
     appearance: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+
+.pk-input-field::placeholder {
+    color: var(--pk-card-muted);
+    opacity: 0.65;
 }
 
 .pk-input-field:focus {
     border-color: var(--pk-input-focus);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
 }
 
 .pk-input-clear-btn {
     position: absolute;
-    right: 8px;
+    right: 6px;
     width: 26px;
     height: 26px;
     border: none;
     border-radius: 999px;
     background: transparent;
     color: var(--pk-card-muted);
+    opacity: 0.7;
     display: none;
     align-items: center;
     justify-content: center;
@@ -1163,15 +804,19 @@
     touch-action: manipulation;
 }
 
+.pk-input-clear-btn:hover {
+    opacity: 1;
+}
+
 .pk-input-clear-btn.pk-visible {
     display: inline-flex;
 }
 
 .pk-confirm-modal-body {
-    font-size: 0.92em;
-    line-height: 1.5;
-    color: var(--pk-card-text);
-    padding: 2px 2px 4px;
+    font-size: 0.88em;
+    line-height: 1.55;
+    color: var(--pk-card-muted);
+    padding: 0 1px 2px;
     overflow-wrap: anywhere;
 }
 
@@ -1179,8 +824,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--pk-slot-border);
+    padding-top: 4px;
 }
 
 .pk-input-modal-footer .pk-slot-cancel-btn,
@@ -1189,34 +833,34 @@
 }
 
 @media (max-width: 520px) {
-    #prompt-keeper-slot-modal.pk-slot-modal-backdrop,
+    #prompt-keeper-slot-modal.pk-slot-modal-backdrop {
+        align-items: center;
+        padding: max(14px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom)) 14px;
+    }
+
+    /* 输入弹窗在移动端置于软键盘安全区（屏幕偏上方），杜绝键盘弹出顶移弹窗造成合成点击落在背景遮罩上 */
     #prompt-keeper-input-modal.pk-slot-modal-backdrop {
-        align-items: flex-end;
-        padding: max(10px, env(safe-area-inset-top)) 10px max(12px, calc(env(safe-area-inset-bottom) + 8px)) 10px;
+        align-items: flex-start;
+        padding: max(18vh, calc(env(safe-area-inset-top) + 48px)) 16px max(16px, env(safe-area-inset-bottom)) 16px;
     }
 
     #prompt-keeper-slot-modal .pk-slot-modal,
     #prompt-keeper-input-modal .pk-slot-modal {
         width: 100%;
-        border-radius: 22px;
-        padding: 14px 14px 16px;
-        animation: pkSheetSlideUp 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .pk-sheet-grabber {
-        display: block;
+        border-radius: 14px;
+        padding: 16px;
     }
 
     .pk-slot-icon-tool {
-        height: 34px;
-        min-width: 34px;
+        height: 32px;
+        min-width: 32px;
     }
 
     .pk-slot-action-btn,
     .pk-slot-clear-all-btn,
     .pk-slot-cancel-btn {
-        min-height: 40px;
-        height: 40px;
-        font-size: 0.86em;
+        min-height: 38px;
+        height: 38px;
+        font-size: 0.84em;
     }
 }
