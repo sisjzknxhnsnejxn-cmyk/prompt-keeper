@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Prompt Keeper - 预设槽位选择与管理模态弹窗
  */
 
@@ -25,7 +25,6 @@ import {
     shouldHandleInteraction,
     shouldSuppressSyntheticClick,
 } from '../utils/dom-events.js';
-import { hasOwnSlot } from '../utils/format.js';
 import {
     bindIOSModalViewportAndScrollLock,
     bindModalBackdropIsolationAndDismiss,
@@ -50,7 +49,10 @@ export function closeSlotPickerModal() {
     }
 }
 
-export function openSlotPickerModal(mode = 'restore') {
+/**
+ * 打开预设槽位弹窗：列出当前聊天的全部槽位，支持恢复、仅套用条目、设为默认、删除与清空。
+ */
+export function openSlotPickerModal() {
     if (typeof jQuery === 'undefined') return;
     closeSlotPickerModal();
 
@@ -77,7 +79,7 @@ export function openSlotPickerModal(mode = 'restore') {
         `<div id="prompt-keeper-slot-modal" class="pk-slot-modal-backdrop pk-modal-overlay ${themeClass}" role="dialog" aria-modal="true"></div>`
     );
     const $dialog = jQuery('<div class="pk-slot-modal"></div>');
-    const titleText = mode === 'delete' ? '管理预设槽位' : '预设槽位';
+    const titleText = '预设槽位';
 
     const $header = jQuery('<div class="pk-slot-modal-header"></div>');
     const $headerTitleWrap = jQuery('<div class="pk-slot-modal-title-wrap"></div>');
@@ -247,7 +249,7 @@ export function openSlotPickerModal(mode = 'restore') {
         }
         if (action === 'set-default') {
             await setDefaultSlot(slotName);
-            openSlotPickerModal(mode);
+            openSlotPickerModal();
             return;
         }
         if (action === 'delete') {
@@ -267,7 +269,7 @@ export function openSlotPickerModal(mode = 'restore') {
             if (deleted) {
                 const { savedState: nextState } = getSavedStateFromCurrentChat();
                 if (getSlotEntries(nextState).length > 0) {
-                    openSlotPickerModal(mode);
+                    openSlotPickerModal();
                 } else {
                     closeSlotPickerModal();
                 }
@@ -346,6 +348,9 @@ export function openSlotPickerModal(mode = 'restore') {
     };
 }
 
+/**
+ * 顶栏「恢复」按钮：始终打开槽位弹窗，由用户选择恢复 / 仅套用条目 / 设为默认 / 删除。
+ */
 export async function handleRestoreClick() {
     const { savedState } = getSavedStateFromCurrentChat();
     const entries = getSlotEntries(savedState);
@@ -357,29 +362,5 @@ export async function handleRestoreClick() {
         return;
     }
 
-    if (entries.length === 1 && hasOwnSlot(savedState.slots, entries[0][0])) {
-        await restoreStatesFromMetadata(true, null, entries[0][0]);
-        return;
-    }
-
-    openSlotPickerModal('restore');
-}
-
-export async function handleDeleteClick() {
-    const { savedState } = getSavedStateFromCurrentChat();
-    const entries = getSlotEntries(savedState);
-
-    if (!savedState || entries.length === 0) {
-        if (typeof toastr !== 'undefined') {
-            toastr.info('当前聊天没有已保存的预设条目状态。', 'Prompt Keeper');
-        }
-        return;
-    }
-
-    if (entries.length === 1 && hasOwnSlot(savedState.slots, entries[0][0])) {
-        await deleteSavedStates(entries[0][0], false);
-        return;
-    }
-
-    openSlotPickerModal('delete');
+    openSlotPickerModal();
 }

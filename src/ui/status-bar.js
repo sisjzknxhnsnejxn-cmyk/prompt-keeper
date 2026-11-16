@@ -14,7 +14,6 @@ export function flushStatusDisplayUpdate() {
 
     if (typeof jQuery === 'undefined') return;
     const $status = jQuery('#prompt-keeper-status');
-    const $deleteBtn = jQuery('#prompt-keeper-delete');
     const $restoreBtn = jQuery('#prompt-keeper-restore');
     if ($status.length === 0) return;
 
@@ -38,7 +37,6 @@ export function flushStatusDisplayUpdate() {
             .removeClass('saved pk-saved')
             .addClass('not-saved pk-not-saved')
             .removeAttr('title');
-        $deleteBtn.hide();
         $restoreBtn
             .prop('disabled', true)
             .addClass('disabled')
@@ -51,13 +49,10 @@ export function flushStatusDisplayUpdate() {
         .removeClass('not-saved pk-not-saved')
         .addClass('saved pk-saved')
         .removeAttr('title');
-    $deleteBtn
-        .show()
-        .attr('title', '删除');
     $restoreBtn
         .prop('disabled', false)
         .removeClass('disabled')
-        .attr('title', '恢复');
+        .attr('title', '恢复 / 管理槽位');
 }
 
 export function scheduleStatusDisplayRender(payload) {

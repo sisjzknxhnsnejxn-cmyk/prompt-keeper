@@ -27,7 +27,7 @@ import {
     shouldSuppressSyntheticClick,
     updateTouchMove,
 } from '../utils/dom-events.js';
-import { handleDeleteClick, handleRestoreClick } from './slot-picker-modal.js';
+import { handleRestoreClick } from './slot-picker-modal.js';
 import { injectSettingsPanel } from './settings-panel.js';
 import { updateStatusDisplay } from './status-bar.js';
 import { buildPromptKeeperBarHTML } from './templates.js';
@@ -149,10 +149,6 @@ export async function runPromptKeeperButtonAction(buttonElement, event) {
     }
     if (buttonId === 'prompt-keeper-restore') {
         await handleRestoreClick();
-        return;
-    }
-    if (buttonId === 'prompt-keeper-delete') {
-        await handleDeleteClick();
     }
 }
 

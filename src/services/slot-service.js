@@ -417,13 +417,14 @@ export async function deleteSavedStates(slotName = null, skipConfirm = false) {
             const remaining = getSlotEntries(savedState);
             if (remaining.length === 0) {
                 if (chatMetadata) delete chatMetadata[METADATA_KEY];
-                syncSlotBackupForChat(chatId, null, { deletedSlotName: targetSlot });
+                // 仅清空当前聊天自己的备份，不影响其它聊天中的同名槽位
+                syncSlotBackupForChat(chatId, null, { clearAllForChat: true });
             } else {
                 if (savedState.defaultSlot === targetSlot) {
                     savedState.defaultSlot = remaining[0][0];
                 }
                 if (chatMetadata) chatMetadata[METADATA_KEY] = savedState;
-                syncSlotBackupForChat(chatId, savedState, { deletedSlotName: targetSlot });
+                syncSlotBackupForChat(chatId, savedState);
             }
 
             await persistChatMetadata();

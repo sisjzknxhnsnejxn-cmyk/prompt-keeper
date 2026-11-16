@@ -107,19 +107,6 @@ body.pk-prevent-pull-to-refresh {
     cursor: not-allowed;
 }
 
-.prompt-keeper-btn-group .pk-bar-btn-danger,
-.prompt-keeper-btn-group .prompt-keeper-btn-danger {
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.35);
-    background: rgba(239, 68, 68, 0.08);
-}
-
-.prompt-keeper-btn-group .pk-bar-btn-danger:hover:not(:disabled),
-.prompt-keeper-btn-group .prompt-keeper-btn-danger:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.16);
-    border-color: rgba(239, 68, 68, 0.55);
-}
-
 .prompt-keeper-btn-group .pk-bar-btn i,
 .prompt-keeper-btn-group .pk-bar-btn span,
 .prompt-keeper-btn-group .menu_button i,

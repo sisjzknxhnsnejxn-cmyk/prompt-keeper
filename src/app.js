@@ -12,7 +12,11 @@ import {
     syncPluginSettingsWithServer,
     teardownPageRefreshProtection,
 } from './core/settings.js';
-import { invalidateSlotsBackupCache } from './core/state-migration.js';
+import {
+    clearLegacyLocalSlotsBackup,
+    readLegacyLocalSlotsBackup,
+} from './core/state-migration.js';
+import { loadSlotsFileBackup, resetSlotsFileBackupState } from './core/slots-file-backup.js';
 import { onChatChanged, onUserPresetChanged } from './services/auto-restore-service.js';
 import { hasChatBoundSavedState } from './services/slot-service.js';
 import {
@@ -69,6 +73,7 @@ export function destroyPromptKeeper() {
     teardownPageRefreshProtection();
     closeInputModal();
     closeSlotPickerModal();
+    resetSlotsFileBackupState();
     resetRuntimeState();
 
     if (typeof jQuery !== 'undefined') {
@@ -119,16 +124,38 @@ export function initPromptKeeper(attempt = 0) {
         }
     };
 
+    /**
+     * APP_READY 后一次性拉取服务端槽位备份文件到内存（读取阶段绝不写入聊天元数据），
+     * 并在服务端尚无文件时把旧版 localStorage 备份迁移过去。
+     */
+    const initSlotsFileBackup = async () => {
+        try {
+            const legacyByChat = readLegacyLocalSlotsBackup();
+            const hasBackup = await loadSlotsFileBackup({ legacyByChat });
+            if (legacyByChat) {
+                clearLegacyLocalSlotsBackup();
+            }
+            if (hasBackup && isPluginEnabled()) {
+                updateStatusDisplay();
+            }
+        } catch (e) {
+            console.warn(LOG_PREFIX, 'Failed to initialize slots file backup.', e);
+        }
+    };
+
     const handleAppReady = () => {
         const isFirstReady = !runtimeState.promptKeeperAppReadyHandled;
         runtimeState.promptKeeperAppReadyHandled = true;
 
         syncPluginSettingsWithServer();
         applyPageRefreshProtection();
-        invalidateSlotsBackupCache();
         cleanupLegacyAccountStorage();
         ensureUIMounted('appReady');
         syncSettingsPanelUI();
+
+        if (isFirstReady) {
+            initSlotsFileBackup();
+        }
 
         if (isFirstReady && isPluginEnabled()) {
             // 无论当前聊天是否已有存档，先记录当前 chatId，防止后续在同聊天保存+切预设+点正则重载时被误判为新聊天
@@ -166,7 +193,6 @@ export function initPromptKeeper(attempt = 0) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED_AFTER, () => {
             syncPluginSettingsWithServer();
             applyPageRefreshProtection();
-            invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             scheduleEnsurePromptKeeperUI('settingsLoadedAfter');
@@ -178,7 +204,6 @@ export function initPromptKeeper(attempt = 0) {
         registerEventSourceListener(eventSource, event_types.EXTENSION_SETTINGS_LOADED, () => {
             syncPluginSettingsWithServer();
             applyPageRefreshProtection();
-            invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             scheduleEnsurePromptKeeperUI('extensionSettingsLoaded');
@@ -190,7 +215,6 @@ export function initPromptKeeper(attempt = 0) {
         registerEventSourceListener(eventSource, event_types.SETTINGS_LOADED, () => {
             syncPluginSettingsWithServer();
             applyPageRefreshProtection();
-            invalidateSlotsBackupCache();
             syncSettingsPanelUI();
             if (!isPluginEnabled()) return;
             updateStatusDisplay();

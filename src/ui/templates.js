@@ -24,10 +24,6 @@ export function buildPromptKeeperBarHTML() {
             <i class="fa-solid fa-rotate-left"></i>
             <span>恢复</span>
         </button>
-        <button id="prompt-keeper-delete" type="button" class="prompt-keeper-btn pk-bar-btn prompt-keeper-btn-danger" title="删除" style="display:none;">
-            <i class="fa-solid fa-trash-can"></i>
-            <span>删除</span>
-        </button>
     </div>
 </div>`;
 }
